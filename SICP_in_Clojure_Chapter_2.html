@@ -1,0 +1,2392 @@
+<h3>Exercise 2.4</h3>
+
+<pre>
+; using consf since cons is reserved
+(defn consf [x y]
+  (fn [m] (m x y)))
+
+(defn car [z] (z (fn [p q] p)))
+(defn cdr [z] (z (fn [p q] q)))
+
+</pre>
+
+Testing (car (consf x y))
+<pre>
+(car (fn [m] (m x y)))
+((fn [m] (m x y)) (fn [p q] p))
+((fn [p q] p) x y)
+(x)
+</pre>
+
+Testing (cdr (consf x y))
+<pre>
+(cdr (fn [m] (m x y)))
+((fn [m] (m x y)) (fn [p q] q))
+((fn [p q] q) x y)
+(y)
+</pre>
+
+
+<h3>Exercise 2.5</h3>
+
+Since 2 and 3 are prime, 2<sup>a</sup> and 3<sup>b</sup> are guaranteed to never have any common factors, other than 1.
+Therefore the prime factorization of 2<sup>a</sup>3<sup>b</sup> can be evaluated for the number of its factors 2 and 3, a and b, respectively.
+
+<pre>
+; using consf since cons is a reserved word
+(defn pow
+  "return x^y where y is a non-negative integer"
+  [x y]
+  (loop [y y acc 1]
+    (if (= y 0)
+        acc
+        (recur (dec y) (* acc x)))))
+    
+(defn consf [a b] (* (pow 2 a) (pow 3 b)))
+
+
+(defn powerFactor
+  "return power of prime factor p in n"
+  [n p]
+  (loop [n n acc 0]
+    (if (not= 0 (rem n p))
+        acc
+        (recur (/ n p) (inc acc)))))
+
+(defn car [z] (powerFactor z 2))
+(defn cdr [z] (powerFactor z 3))
+</pre>
+
+<h3>Exercise 2.6</h3>
+
+<pre>
+(def zero (fn [f] (fn [x] x)))
+(defn add-1 [n] (fn [f] (fn [x] (f (n f) x))))
+
+
+(def one (fn [f] (fn [x] (f x))))
+(def two (fn [f] (fn [x] (f (f x)))))
+
+(defn plus [a b]
+  (fn [f] (fn [x] ((a f) ((b f) x)))))
+</pre>
+
+
+<h3>Exercise 2.7</h3>
+
+<pre>
+(defstruct interval :lower-bound :upper-bound)
+
+(defn make-interval [a b] (struct interval a b))
+(def lower-bound (accessor interval :lower-bound))
+(def upper-bound (accessor interval :upper-bound))
+
+(defn add-interval [x y]
+  (make-interval (+ (lower-bound x) (lower-bound y))
+                 (+ (upper-bound x) (upper-bound y))))
+
+(defn mul-interval [x y]
+  (let [p1 (* (lower-bound x) (lower-bound y))
+        p2 (* (lower-bound x) (upper-bound y))
+        p3 (* (upper-bound x) (lower-bound y))
+        p4 (* (upper-bound x) (upper-bound y))]
+    (make-interval (min p1 p2 p3 p4)
+                   (max p1 p2 p3 p4))))
+
+(defn div-interval [x y]
+  (mul-interval x 
+    (make-interval (/ 1.0 (upper-bound y))
+                   (/ 1.0 (lower-bound y)))))
+
+</pre>
+
+<h3>Exercise 2.8</h3>
+
+<pre>
+(defn sub-interval [x y]
+  (add-interval x
+                (make-interval (- (upper-bound y)) (- (lower-bound y)))))
+</pre>
+
+
+<h3>Exercise 2.9</h3>
+
+The width of the result of an arithmetic operation on intervals is one-halfth
+the upper bound of the result minus the lower bound of the result.
+Representing intervals algebraically,
+(x1-w1, x1+w1) + (x2-w2, x2+w2) = (x1+x2-w1-w2, x1+x2+w1+w2)
+The width of this result is w1+w2, obviously a function of w1 and w2.
+Similarly for subtraction:
+(x1-w1, x1+w1) - (x2-w2, x2+w2) = (x1-x2-w1-w2, x1-x2+w1+w2)
+Again the width of this result is w1+w2, obviously a function of w1 and w2.
+
+For multiplication, assuming x1, x2 &gt;&gt; 1 and w1, w2 &lt;&lt; x1, x2,
+but still greater than 1,
+(x1-w1, x1+w1) * (x2-w2, x2+w2) = (x1x2 -w1x2 - w2x1 + w1w2, x1x2 + w1x2 + w2x1 + w1w2)
+The width of this result is w1x2 + w2x1. Clearly this is not just a function
+of w1 and w2. The same holds for division, which can be readily seen since
+division can be reduced to multiplication.
+
+(3, 5) * (5, 7) = (15, 35), width is w1x2 + w2x1, or 1*6 + 1*4 = 10
+(5, 7) / (3, 5) = (1, 7/3), width is (w1x2 + w2x1)/((x2+w2)*(x2-w2))
+= (3 + 5) / (4*3) = 8 / 12 = 2/3
+
+<h3>Exercise 2.10</h3>
+
+<pre>
+(defn div-interval [x y]
+  (if (and (&lt; (lower-bound y) 0.0) (&gt; (upper-bound y) 0.0))
+      (throw (IllegalArgumentException. "Divide by zero"))
+      (mul-interval x 
+        (make-interval (/ 1.0 (upper-bound y))
+                       (/ 1.0 (lower-bound y))))))
+</pre>
+
+
+<h3>Exercise 2.11</h3>
+
+Through exhaustive analysis, the various possibilities for intervals
+can be broken down into 9 cases. Describing the intervals as (L1, U1)
+and (L2, U2), the pseudocode for the 9 cases follows:
+
+<pre>
+if (L1 &gt;= 0 &amp;&amp; L2 &gt;= 0)
+  then (L1*L2, U1*U2)
+else if (U1 &lt;= 0 &amp;&amp; U2 &lt;= 0)
+  then (U1*U2, L1*L2)
+else if (L1 &lt; 0 &amp;&amp; L2 &lt; 0 &amp;&amp; U1 &gt; 0 &amp;&amp; U2 &gt; 0)
+  then (MIN L1*U2 L2*U1, MAX L1*L2 U1*U2)
+else if (L1 &gt;= 0 &amp;&amp; U2 &lt;= 0)
+  then (U1*L2, L1*U2)
+else if (L2 &gt;= 0 &amp;&amp; U1 &lt;= 0)
+  then (L1*U2, U1*L2)
+else if (L1 &gt;= 0 &amp;&amp; L2 &lt; 0 &amp;&amp; U2 &gt; 0)
+  then (U1*L2, U1*U2)
+else if (L1 &lt; 0 &amp;&amp; U1 &gt; 0 &amp;&amp; L2 &gt;= 0)
+  then (L1*U2, U1*U2)
+else if (U1 &lt;= 0 &amp;&amp; L2 &lt; 0 &amp;&amp; U2 &gt; 0)
+  then (L1*U2, L1*L2)
+else if (L1 &lt; 0 &amp;&amp; U1 &gt; 0 &amp;&amp; U2 &lt;= 0)
+  then (U1*L2, L1*L2)
+</pre>
+
+
+Double-checking that these cover all cases, number the cases A-I and
+verifying that each possible scenario falls into a case:
+
+-- -- B
+-- -0 B
+-- -+ H
+-- 00 B
+-- 0+ E
+-- ++ E
+-0 -- B
+-0 -+ H
+-0 00 B
+-0 0+ E
+-0 ++ E
+-+ -- I
+-+ -0 I
+-+ -+ C
+-+ 00 G
+-+ 0+ G
+-+ ++ G
+00 -- B
+00 -0 B
+00 -+ F
+00 00 A
+00 0+ A
+00 ++ A
+0+ -- D
+0+ -0 D
+0+ -+ F
+0+ 00 A
+0+ 0+ A
+0+ ++ A
+++ -- D
+++ -0 D
+++ -+ F
+++ 00 A
+++ 0+ A
+++ ++ A
+
+
+Coding this, along with a tester to compare it to earlier mul-interval for various scenarios:
+
+<pre>
+(defn mul-interval-new [x y]
+  (let [l1 (lower-bound x)
+	    l2 (lower-bound y)
+        u1 (upper-bound x)
+        u2 (upper-bound y)]
+    (cond (and (&gt;= l1 0) (&gt;= l2 0)) (make-interval (* l1 l2) (* u1 u2))
+          (and (&lt;= u1 0) (&lt;= u2 0)) (make-interval (* u1 u2) (* l1 l2))
+          (and (&lt; l1 0) (&lt; l2 0) (&gt; u1 0) (&gt; u2 0)) (make-interval (min (* l1 u2) (* l2 u1)) (max (* l1 l2) (* u1 u2)))
+          (and (&gt;= l1 0) (&lt;= u2 0)) (make-interval (* u1 l2) (* l1 u2))
+          (and (&gt;= l2 0) (&lt;= u1 0)) (make-interval (* l1 u2) (* u1 l2))
+          (and (&gt;= l1 0) (&lt; l2 0) (&gt; u2 0)) (make-interval (* u1 l2) (* u1 u2))
+          (and (&lt; l1 0) (&gt; u1 0) (&gt;= l2 0)) (make-interval (* l1 u2) (* u1 u2))
+          (and (&lt;= u1 0) (&lt; l2 0) (&gt; u2 0)) (make-interval (* l1 u2) (* l1 l2))
+          :else (make-interval (* u1 l2) (* l1 l2)))))
+
+
+(defn cmpval [f1 f2 x y]
+  (let [i1 (f1 x y)
+        i2 (f2 x y)]
+    (if (not= i1 i2) (println "Failed for " x y))))
+
+(defn testcases [f1 f2]
+  (cmpval f1 f2 (make-interval -10 10) (make-interval -10 10))
+  (cmpval f1 f2 (make-interval -10 0) (make-interval -10 10))
+  (cmpval f1 f2 (make-interval -10 -5) (make-interval -10 7))
+  (cmpval f1 f2 (make-interval 0 0) (make-interval 0 0))
+  (cmpval f1 f2 (make-interval 0 0) (make-interval -16 0))
+  (cmpval f1 f2 (make-interval 0 0) (make-interval -16 -12))
+  (cmpval f1 f2 (make-interval 0 0) (make-interval -13 7))
+  (cmpval f1 f2 (make-interval 0 0) (make-interval 0 3))
+  (cmpval f1 f2 (make-interval -7 -3) (make-interval 7 17))
+  (cmpval f1 f2 (make-interval -7 -2) (make-interval 0 21))
+  (cmpval f1 f2 (make-interval 3 7) (make-interval 0 0))
+  (cmpval f1 f2 (make-interval 4 6) (make-interval -7 -2))
+  (cmpval f1 f2 (make-interval 5 7) (make-interval -13 0))
+  (cmpval f1 f2 (make-interval 4 8) (make-interval -12 17))
+  (cmpval f1 f2 (make-interval 7 13) (make-interval 7 13))
+  (cmpval f1 f2 (make-interval 7 11) (make-interval 0 21))
+  (cmpval f1 f2 (make-interval -12 7) (make-interval -13 1))
+  (cmpval f1 f2 (make-interval -17 2) (make-interval -5 20)))
+
+
+</pre>
+
+<h3>Exercise 2.12</h3>
+
+<pre>
+(defn abs [x] (if (&lt; x 0) (- x) x))
+
+(defn make-center-width [c w]
+  (make-interval (- c w) (+ c w)))
+
+(defn center [i] (/ (+ (lower-bound i) (upper-bound i)) 2))
+(defn width [i] (/ (- (upper-bound i) (lower-bound i)) 2))
+
+(defn make-center-percent
+  "Interval constructor taking a center point and percent tolerance"
+  [center pct-tol]
+  (let [width (abs (* center pct-tol))]
+    (make-interval (- center width) (+ center width))))
+
+(defn percent [i]
+  (/ (width i) (center i)))
+</pre>
+
+
+
+<h3>Exercise 2.13</h3>
+
+Intervals can be expressed as c +/- tc, where c is center and t is a tolerance
+percentage. Assuming all numbers are positive, product of two intervals,
+c1 +/- t*c1 and c2 +/- t*c2 = (c1*(1-t1) * c2*(1-t2), c1*(1+t1) * c2(1+t2))
+= (c1*c2 * (1-t1)(1-t2), c1*c2 * (1+t1)(1+t2))
+= (c1*c2 * (1 - t1 - t2 - t1*t2), c1*c2 * (1 + t1 + t2 + t1*t2))
+
+So tolerance of the product interval = t1 + t2 + t1*t2
+For small values of t1 and t2, this is approximately equal to t1+t2 since
+t1*t2 will be quite small indeed.
+
+
+
+
+<h3>Exercise 2.14</h3>
+
+R1R2 / (R1+R2)   = (RL1,RH1)(RL2,RH2) / ((RL1,RH1) + (RL2,RH2))
+= (RL1*RL2,RH1*RH2) / (RL1+RL2,RH1+RH2)
+= (RL1*RL2,RH1*RH2) * (1/(RH1+RH2),1/(RL1+RL2)
+= (RL1*RL2/(RH1+RH2),RH1*RH2/(RL1+RL2))
+
+1 / (1/R1 + 1/R2)
+= (1,1) / ((1,1) / (RL1,RH1) + (1,1) / (RL2,RH2))
+= (1,1) / ((1,1)*(1/RH1,1/RL1) + (1,1)*(1/RH2,1/RL1))
+= (1,1) / ((1/RH1,1/RL1) + (1/RH2,1/RL2))
+= (1,1) / (1/RH1 + 1/RH2, 1/RL1 + 1/RL2)
+= (1,1) / (RH1+RH2 / (RH1*RH2), RL1+RL2 / (RL1*RL2))
+= (1,1) * ((RL1*RL2)/(RL1+RL2),(RH1*RH2)/(RH1+RH2))
+= ((RL1*RL2)/(RL1+RL2),(RH1*RH2)/(RH1+RH2))
+
+
+These 2 versions differ in the denominators, so they yield differing
+results in general.
+
+
+Computing expressions like A/A having the same non-zero-width interval variable occurring more than once tends to yield incorrect results. Obviously the correct answer for A/A ought to be (1,1), but instead we end up with a non-zero-width interval, effectively treating the two occurrences of A as independent variables, that are allowed to take on different values.
+
+<pre>
+user=&gt; (def a (make-center-percent 4.2 0.1))
+#'user/a
+user=&gt; (div-interval a a)
+{:lower-bound 0.8181818181818182, :upper-bound 1.222222222222222}
+user=&gt; (percent (div-interval a a))
+0.19801980198019795
+user=&gt; (def b (make-center-percent 13 0.7))
+#'user/b
+user=&gt; (percent (div-interval b b))
+0.9395973154362415
+user=&gt; (div-interval a b)
+{:lower-bound 0.17104072398190046, :upper-bound 1.1846153846153846}
+user=&gt; (percent (div-interval a b))
+0.7476635514018691
+user=&gt; (center (div-interval a b))
+0.6778280542986426
+user=&gt;
+</pre>
+
+
+<h3>Exercise 2.15</h3>
+
+Yes, Eva is correct: expressions with the same uncertain interval variable occurring more than once add more uncertainty into the final results (looser error bounds) than is actually warranted. We see this with A/A, which ought to have a certain value of 1, but instead accumulates uncertainty. par2 is indeed a "better" program from this perspective, since it does not suffer from this deficiency and should calculate tighter bounds than par1.
+
+
+<h3>Exercise 2.16</h3>
+
+As has been discussed in exercises 2.14 and 2.15, an algebraic expression containing an uncertain variable more than once can return erroneous results, by erroneously treating each occurrence of the variable as independent variables. An algebraic equivalent expression that doesn't contain this duplicate variable won't suffer from this, and therefore will return a different answer.
+
+
+For constructing an interval-arithmetic package that does not have this shortcoming, one approach could lock the multiple occurrences of the same variable together. It still appears that only the endpoints of each interval need be considered for computing the overall answer. But the simplest implementation would still consider all permutations of interval endpoints, and return the interval determined by the overall minimum and maximum. This may be difficult to achieve, but seems possible.
+
+Problems arise in cases where "literal" intervals defined with make-interval are used in lieu of variables. Multiple occurrences of identical literal intervals may be involved in an expression. It is not possible to know whether these identical intervals correspond to the same measured value (i.e., should be treated as locked together), or whether they happen to be identical via coincidence, and hence should be correctly treated as independent. The safest thing to do here is to always assume these literal intervals are independent, but this assumption may not always align with the user's assumptions. In these cases, the new interval arithmetic package will still suffer from this "shortcoming".
+
+
+We have not learned how to distinguish between a literal expression and a variable reference to an expression, so it does not seem possible to devise an interval arithmetic package that performs as we would want it to.
+
+
+<h3>Exercise 2.17</h3>
+
+<pre>
+(defn last-pair
+  "Return list containing last element of specified sequence"
+  [seq]
+  (if (empty? (rest seq))
+    seq
+    (recur (rest seq))))
+</pre>
+
+<h3>Exercise 2.18</h3>
+
+<pre>
+; defining reverse for Exercise 2.18 even though it's already built-in
+(defn reverse-seq
+  "Return reverse of specified sequence"
+  [seq]
+  (defn revR [acc seq]
+    (if (empty? seq)
+      acc
+      (recur (cons (first seq) acc) (rest seq))))
+  (revR () seq))
+</pre>
+
+
+<h3>Exercise 2.19</h3>
+
+<pre>
+(def first-denomination first)
+(def except-first-denomination rest)
+(def no-more? empty?)
+
+(defn cc
+  "Return # of ways to count change for the specified amount using specified coins"
+  [amount coin-values]
+  (cond (= amount 0) 1
+        (or (&lt; amount 0) (no-more? coin-values)) 0
+        :else (+ (cc amount
+                     (except-first-denomination coin-values))
+                 (cc (- amount
+                        (first-denomination coin-values))
+                     coin-values))))
+
+
+</pre>
+
+Order of coin-values does not affect the answer produced by cc because cc does not regard coin-values as an ordered list (e.g., aborting consumption of list when a certain denomination is reached) -- it always consumes the list until amount is exhausted or the list itself is exhausted.
+
+
+<h3>Exercise 2.20</h3>
+
+<pre>
+(defn same-parity
+  "Return list containing all arguments that have the same even/odd parity as the first argument"
+  [&amp; args]
+  (filter (fn [x] (= (even? x) (even? (first args)))) args))
+</pre>
+
+
+<h3>Exercise 2.21</h3>
+
+<pre>
+(defn square-list1 [items]
+  (if (empty? items)
+    ()
+    (let [frst (first items)]
+      (cons (* frst frst) (square-list1 (rest items))))))
+
+(defn square-list2 [items]
+  (map (fn [x] (* x x)) items))
+</pre>
+
+
+<h3>Exercise 2.22</h3>
+
+Louis' iterative version of square-list produces the answer list in the reverse order because on each iteration it peels one element from the left side of the input list and prepends a corresponding element onto the front of the output list. So as the input list is read left-to-right, the output list is built right-to-left.
+
+Reversing the order of the arguments to cons doesn't solve the problem. Cons expects its first argument to be of type element and the second argument to be of type sequence[element], so you generally cannot switch arguments around and even if the type system lets you do it, it would yield nonsensical results. The correct fix is to either not use cons to build up the output list (appending to end of list instead), or to do it as a linear recursive process, or else simply reverse the output list as a final step.
+
+
+<h3>Exercise 2.23</h3>
+
+<pre>
+(defn for-each
+  "Apply f to each element in specified sequence, discarding results"
+  [f seq]
+  (if (empty? seq)
+    ()
+    (do
+      (f (first seq))
+      (recur f (rest seq)))))
+</pre>
+
+<h3>Exercise 2.24</h3>
+
+(list 1 (list 2 (list 3 4))) would be printed as
+(1 (2 (3 4))) by the interpreter. ASCII-art box-and-pointer structure is
+<pre>
++-+-+  +-+-+
+|.|.--&gt;|.|/|
++|+-+  +|+-+
+ |      |
+ V      V
+ 1     +-+-+  +-+-+
+       |.|.--&gt;|.|/|
+       +|+-+  +|+-+
+        |      |
+        V      V
+        2     +-+-+  +-+-+
+              |.|.--&gt;|.|/|
+              +|+-+  +|+-+
+               |      |
+               V      V
+               3      4
+</pre>
+
+And viewed as a tree,
+
+<pre>
+
++--&gt; 1
+|
++--+--&gt; 2
+   |
+   +--+--&gt; 3
+      |
+      +--&gt; 4
+</pre>
+
+
+<h3>Exercise 2.25</h3>
+
+(car (cdr (car (cdr (cdr x))))) (or cadaddr x) will return 7 when x is (1 3 (5 7) 9)<br />
+In Clojure this would be written
+(first (rest (first (rest (rest x)))))<br /><br />
+
+
+(car (car x)) (or caar x) will return 7 when x is ((7))<br />
+In Clojure this would be written
+(first (first x))<br /><br />
+
+(car (cdr (car (cdr (car (cdr (car (cdr (car (cdr (car (cdr x)))))))))))) returns 7 when x is (1 (2 (3 (4 (5 (6 7))))))<br />
+In Clojure this would be written
+(first (rest (first (rest (first (rest (first (rest (first (rest (first (rest x))))))))))))<br />
+
+
+<h3>Exercise 2.26</h3>
+
+(append x y) would print (1 2 3 4 5 6)
+(cons x y) would print ((1 2 3) 4 5 6)
+(list x y) would print ((1 2 3) (4 5 6))
+
+
+<h3>Exercise 2.27</h3>
+
+<pre>
+; deep-reverse-seq reverses all sub-sequences as well as outer sequence
+(defn deep-reverse-seq
+  "Return deep reverse of specified sequence"
+  [seq]
+  (defn revR [acc seq]
+    (if (empty? seq)
+      acc
+      (let [frstEl (first seq)]
+      (recur (cons (if (seq? frstEl) (deep-reverse-seq frstEl) frstEl) acc) (rest seq)))))
+  (revR () seq))
+</pre>
+
+<h3>Exercise 2.28</h3>
+
+<pre>
+(defn fringe
+  "return list of leaves of tree in left-to-right order"
+  [tree]
+  (if (seq? tree)
+    (if (empty? tree)
+      ()
+      (concat (fringe (first tree)) (fringe (rest tree))))
+    (list tree)))
+</pre>
+
+
+<h3>Exercise 2.29</h3>
+
+<pre>
+(defn make-mobile
+  "Make binary mobile, based on left and right branch"
+  [left right]
+  (list left right))
+
+
+(defn make-branch
+  "Make mobile branch based upon its length and structure"
+  [len struc]
+  (list len struc))
+
+
+(defn left-branch
+  "return left branch of binary mobile"
+  [mobile]
+  (first mobile))
+
+(defn right-branch
+  "return right branch of binary mobile"
+  [mobile]
+  (first (rest mobile)))
+
+(defn branch-length
+  "return length of a binary mobile branch"
+  [branch]
+  (first branch))
+
+(defn branch-structure
+  "return structure associated with a binary mobile branch"
+  [branch]
+  (first (rest branch)))
+
+(defn is-simple-weight?
+  "return whether structure is a simple weight (versus a mobile)"
+  [struc]
+  (not (seq? struc)))
+
+(defn total-weight
+  "return total weight of a binary mobile"
+  [mobile]
+  (defn total-branch-weight
+    "return total weight associated with a branch, ignoring arm weight"
+    [branch]
+    (let [struc (branch-structure branch)]
+      (if (is-simple-weight? struc)
+        struc
+        (total-weight struc))))
+  (+ (total-branch-weight (left-branch mobile))
+     (total-branch-weight (right-branch mobile))))
+
+
+(defn balanced?
+  "return whether specified binary mobile is balanced"
+  [mobile]
+  (let [leftbranch (left-branch mobile)
+        rightbranch (right-branch mobile)
+        leftstruc (branch-structure leftbranch)
+        rightstruc (branch-structure rightbranch)
+        leftweight (if (is-simple-weight? leftstruc)
+                     leftstruc
+                     (total-weight leftstruc))
+        rightweight (if (is-simple-weight? rightstruc)
+                      rightstruc
+                      (total-weight rightstruc))
+        leftlen (branch-length leftbranch)
+        rightlen (branch-length rightbranch)
+        lefttorque (* leftlen leftweight)
+        righttorque (* rightlen rightweight)
+        leftbalanced (if (is-simple-weight? leftstruc)
+                       true
+                       (balanced? leftstruc))
+        rightbalanced (if (is-simple-weight? rightstruc)
+                        true
+                        (balanced? rightstruc))]
+    (and (= lefttorque righttorque) leftbalanced rightbalanced)))
+   
+</pre>
+
+
+If we change the representation, then besides the constructors
+make-mobile and make-branch changing, we need to change our "primitive"
+accessors: left-branch, right-branch, branch-length, branch-structure,
+and is-simple-weight?
+
+Clojure doesn't directly support cons cells, but rather deals in sequences, so part d cannot be directly translated into Clojure using cons cells.
+
+
+<h3>Exercise 2.30</h3>
+
+<pre>
+(defn square-tree1
+  "return tree (nested list) structure similar to input but with numbers squared"
+
+  [tree]
+  (cond (not (seq? tree)) (* tree tree)
+    
+        (empty? tree) ()
+        :else (let [frst (first tree)]
+                (cons (square-tree1 frst) (square-tree1 (rest tree))))))
+
+
+(defn square-tree2
+  "return tree (nested list) structure similar to input but with numbers squared"
+
+  [tree]
+  (map (fn [n] (if (seq? n) (square-tree2 n) (* n n))) tree))
+
+</pre>
+
+
+
+<h3>Exercise 2.31</h3>
+
+<pre>
+(defn tree-map
+  "apply a function to every element in a tree (nested list)"
+  [f tree]
+  (map (fn [n] (if (seq? n) (tree-map f n) (f n))) tree))
+</pre>
+
+
+<h3>Exercise 2.32</h3>
+
+<pre>
+(defn subsets
+  "return set of all subsets (powerset) of s"
+  [s]
+  (if (empty? s)
+    (list ())
+    (let [rst (subsets (rest s))]
+      (concat rst (map (fn [x] (cons (first s) x)) rst)))))
+</pre>
+
+This works because powerset can be implemented recursively (or via induction) by considering the base case of an empty list, in which case the powerset is (()), and the non-empty case. In the non-empty case, we separate the first element and the remainder of the set; we generate the powerset of the remainder of the set and then for each element of this remainder powerset, we include in the result both this element and this element with the first element prepended.
+
+Another way of thinking of it is by noticing that the size of the powerset is always equal to 2^n, where n is the size of the input set. This makes sense since each element is included in half the elements in the powerset result. If you consider each element in the input set to correspond to a binary digit position, then looking at the binary expansion of 0..2^n, you build the powerset by selecting the input elements corresponding to the 1 digits for each 0..2^n value.
+
+The anonymous function could be dispensed with if Clojure allowed partial application (e.g., passing (cons (first s)) to map).
+
+
+<h3>Exercise 2.33</h3>
+
+<pre>
+; implement foldr (aka reduce)
+(defn accumulate
+  "accumulate value by applying binary operator to accumulator w/ each element"
+  [op initial sequence]
+  (if (empty? sequence)
+      initial
+      (op (first sequence)
+          (accumulate op initial (rest sequence)))))
+
+; named map-seq since name map is reserved
+(defn map-seq [p sequence]
+  (accumulate (fn [x y] (cons (p x) y)) () sequence))
+
+(defn append [seq1 seq2]
+  (accumulate cons seq2 seq1))
+
+(defn length [sequence]
+  (accumulate (fn [x y] (inc y)) 0 sequence))
+</pre>
+
+
+<h3>Exercise 2.34</h3>
+
+<pre>
+(defn horner-eval
+  "Evaluate polynomial using Horner's rule"
+  [x coefficient-sequence]
+  (accumulate (fn [this-coeff higher-terms] (+ (* x higher-terms) this-coeff))
+              0
+              coefficient-sequence))
+</pre>
+
+
+<h3>Exercise 2.35</h3>
+
+<pre>
+(defn count-leaves
+  "return count of leaves in tree (nested list)"
+  [t]
+  (accumulate (fn [x y] (+ y (if (seq? x) (count-leaves x) 1)))
+              0 t))
+</pre>
+
+I ran into type conversion problems trying to apply count-leaves with map. If you must use map, you can add a dummy map applying the identity function.
+
+
+<h3>Exercise 2.36</h3>
+
+<pre>
+(defn accumulate-n
+  "Accumulate n values, folding using nth element of each specified sequence"
+  [op init seqs]
+  (if (empty? (first seqs))
+    ()
+    (cons (accumulate op init (map first seqs))
+          (accumulate-n op init (map rest seqs)))))
+</pre>
+
+
+<h3>Exercise 2.37</h3>
+
+<pre>
+(defn dot-product
+  "return dot product of two vectors"
+  [v w]
+  (accumulate + 0 (map * v w)))
+
+(defn matrix-star-vector
+  "multiply matrix times vector"
+  [m v]
+  (map (fn [mi] (accumulate + 0 (map * mi v))) m))
+
+(defn transpose
+  "transpose rows and columns in matrix"
+  [mat]
+  (accumulate-n cons () mat))
+
+(defn matrix-star-matrix
+  "multiply matrix by matrix"
+  [m n]
+  (let [cols (transpose n)]
+    (map (fn [mi] (map (fn [nj] (dot-product mi nj)) cols)) m)))
+</pre>
+
+
+<h3>Exercise 2.38</h3>
+
+<pre>
+(defn fold-right
+  "fold from the right-hand side (same as accumulate)"
+  [op initial sequence]
+  (if (empty? sequence)
+      initial
+      (op (first sequence)
+          (fold-right op initial (rest sequence)))))
+
+(defn fold-left
+  "fold from left-hand side"
+  [op initial sequence]
+  (defn iter [result rst]
+    (if (empty? rst)
+      result
+      (iter (op result (first rst))
+            (rest rst))))
+  (iter initial sequence))
+</pre>
+
+
+(fold-right / 1 (list 1 2 3))  equals 3/2<br />
+(fold-left / 1 (list 1 2 3)) equals 1/6<br />
+(fold-right list () (list 1 2 3)) equals (1 (2 (3 ())))<br />
+(fold-left list () (list 1 2 3)) equals (((() 1) 2) 3)<br />
+
+op must be an associative and commutative operation in order to guarantee
+that fold-left and fold-right produce the same values for any sequence.
+
+
+<h3>Exercise 2.39</h3>
+
+<pre>
+; use nested fold-right
+(defn reverse1
+  "reverse sequence using fold-right"
+  [sequence]
+  (fold-right (fn [x y] (fold-right cons (list x) y)) () sequence))
+; using append rather than nested fold-right
+(defn reverse1a
+  "reverse sequence using fold-right"
+  [sequence]
+  (fold-right (fn [x y] (append y (list x))) () sequence))
+
+(defn reverse2
+  "reverse sequence using fold-left"
+  [sequence]
+  (fold-left (fn [x y] (cons y x)) () sequence))
+</pre>
+
+
+<h3>Exercise 2.40</h3>
+
+<pre>
+(defn enumerate-interval [low high]
+  (range low (inc high)))
+
+(defn unique-pairs
+  "return sequence of unique pairs (i,j) with 1 &lt;= j &lt; i &lt;= n"
+  [n]
+  (for [i (range 1 (inc n)) j (range 1 i)] (list i j)))
+
+(defn flatmap
+  "combined map with folding (using append)"
+  [proc seq]
+  (accumulate append () (map proc seq)))
+
+(defn make-pair-sum
+  [pair]
+  (let [fst (first pair) snd (first (rest pair))]
+    (list fst snd (+ fst snd))))
+
+(defn next-divisor
+  "return next divisor value to test for find-divisor"
+  [n]
+  (if (= n 2) 3 (+ n 2)))
+
+; find smallest divisor of n
+(defn remainder [a b] (mod a b))
+(defn square [n] (* n n))
+(defn divides? [a b]
+  (= (remainder b a) 0))
+(defn find-divisor [n test-divisor]
+  (loop [n n test-divisor test-divisor]
+    (cond (&gt; (square test-divisor) n) n
+          (divides? test-divisor n) test-divisor
+          :else (recur n (next-divisor test-divisor)))))
+(defn smallest-divisor [n]
+  (find-divisor n 2))
+
+(defn prime? [n]
+  (= n (smallest-divisor n)))
+
+(defn prime-sum? [pair]
+  (prime? (+ (first pair) (first (rest pair)))))
+
+(defn prime-sum-pairs
+ "return all pairs of unique integers up to n that add up to a prime"
+ [n]
+ (map make-pair-sum
+   (filter prime-sum? (unique-pairs n))))
+</pre>
+
+
+<h3>Exercise 2.41</h3>
+
+<pre>
+(defn ex2_41
+  "return ordered triples of distinct positive ints i,j,k &lt;= n that sum to s"
+  [n s]
+  (for [i (range 1 (inc n)) j (range 1 i) k (range 1 j) :while (= s (+ i j k))]
+    (list i j k)))
+</pre>
+
+
+<h3>Exercise 2.42</h3>
+
+<pre>
+(defn abs [n] (if (&lt; n 0) (- n) n))
+
+(defn enumerate-interval
+  [low high]
+  (range low (inc high)))
+
+(defn flatmap
+  "combined map with folding (using append)"
+  [proc seq]
+  (accumulate append () (map proc seq)))
+
+(def empty-board ())
+
+(defn adjoin-position
+  "return board with queen added at specified row, col"
+  [row col board]
+  (cons (list row col) board))
+
+(defn safe?
+  "return whether queen in kth column is safe w/ respect to positions"
+  [col positions]
+  (defn safeR [p b]
+    (let [position (first (filter (fn [n] &lt;= col (first (rest n))) positions))
+          row (first position)
+          prow (first p)
+          pcol (first (rest p))]
+      (cond (not b) false
+            (= col pcol) b
+            (= row prow) false
+            (= (abs (- row prow)) (abs (- col pcol))) false
+            :else b)))
+  (accumulate safeR true positions))
+
+(defn queens
+  "solve the N queens problem for a board of specified NxN size"
+  [board-size]
+  (defn queen-cols [k]
+    (if (= k 0)
+        (list empty-board)
+        (filter
+          (fn [positions] (safe? k positions))
+          (flatmap
+            (fn [rest-of-queens]
+              (map (fn [new-row] (adjoin-position new-row k rest-of-queens))
+                   (enumerate-interval 1 board-size)))
+            (queen-cols (dec k))))))
+  (queen-cols board-size))
+</pre>
+
+<h3>Exercise 2.43</h3>
+
+queen-cols is a relatively expensive, recursive function. In the original implementation, each call of queen-cols would recursively once into queen-cols with the next lower value of k. By transposing the nested mappings, Louis' implementation is calling queen-cols N times, rather than once, from each call, where N is equal to the board size.<br />
+
+Since this effective multiplication of runtime by N occurs at each level, it becomes an exponential increase in runtime, changing the estimated runtime from T to T * N<sup>N</sup>.
+
+
+<h3>Exercise 2.44</h3>
+
+<pre>
+(defn right-split
+  "recursively split painter to the right, n times"
+  [painter n]
+  (if (= n 0)
+    painter
+    (let [smaller (right-split painter (dec n))]
+      (beside painter (below smaller smaller)))))
+
+(defn up-split
+  "recursively split painter upwards, n times"
+  [painter n]
+  (if (= n 0)
+    painter
+    (let [smaller (up-split painter (dec n))]
+      (below painter (beside smaller smaller)))))
+</pre>
+
+<h3>Exercise 2.45</h3>
+
+<pre>
+(defn split
+  "general painter split defined in terms of an inner and outer operation"
+  [outer inner]
+  (defn splitR [painter n]
+    (if (= n 0)
+      painter
+      (let [smaller (splitR painter (dec n))]
+        (outer painter (inner smaller smaller)))))
+  splitR)
+</pre>
+
+
+<h3>Exercise 2.46</h3>
+
+<pre>
+(defn make-vect [x y] [x y])
+(def xcor-vect first)
+(def ycor-vect second)
+
+
+(defn add-vect
+  "add two vectors"
+  [v1 v2]
+  (let [x1 (xcor-vect v1) x2 (xcor-vect v2)
+        y1 (ycor-vect v1) y2 (ycor-vect v2)]
+    (make-vect (+ x1 x2) (+ y1 y2))))
+
+(defn sub-vect
+  "subtract vector v2 from vector v1"
+  [v1 v2]
+  (let [x1 (xcor-vect v1) x2 (xcor-vect v2)
+        y1 (ycor-vect v1) y2 (ycor-vect v2)]
+    (make-vect (- x1 x2) (- y1 y2))))
+
+(defn scale-vect
+  "multiply vector by a scalar"
+  [s v]
+  (make-vect (* s (xcor-vect v)) (* s (ycor-vect v))))
+</pre>
+
+
+<h3>Exercise 2.47</h3>
+
+Clojure does not use cons cells, so the second constructor cannot work here. Instead I will use a struct.
+
+
+<pre>
+(defn make-frame1
+  "make frame, using a list"
+  [origin edge1 edge2]
+  (list origin edge1 edge2))
+
+(def origin-frame1 first)
+(def edge1-frame1 second)
+(defn edge2-frame1 [f] (nth f 2))
+
+
+(defstruct frame :origin :edge1 :edge2)
+(defn make-frame2
+  "make frame, using a struct"
+  [origin edge1 edge2]
+  (struct frame origin edge1 edge2))
+(def origin-frame2 (accessor frame :origin))
+(def edge1-frame2 (accessor frame :edge1))
+(def edge2-frame2 (accessor frame :edge2))
+</pre>
+
+
+<h3>Exercise 2.48</h3>
+
+<pre>
+(defstruct linesegment :vect-to-origin :vect-to-endpoint)
+(defn make-segment
+  "make line segment from two vectors"
+  [vOrigin vEnd]
+  (struct linesegment vOrigin vEnd))
+
+(def start-segment (accessor linesegment :vect-to-origin))
+(defn end-segment
+  "return endpoint (vector) of a line segment"
+  [ls]
+  (add-vect (:vect-to-origin ls) (:vect-to-endpoint ls)))
+</pre>
+
+
+<h3>Exercise 2.49</h3>
+
+<pre>
+(defn for-each
+  "Apply f to each element in specified sequence, discarding results"
+  [f seq]
+  (if (empty? seq)
+    ()
+    (do
+      (f (first seq))
+      (recur f (rest seq)))))
+
+(defn segments->painter
+  "from list of segments, create a painter procedure that paints into a frame"
+  [segment-list]
+  (fn [frame]
+    (for-each
+      (fn [segment]
+        (draw-line
+          ((frame-coord-map frame) (start-segment segment))
+          ((frame-coord-map frame) (end-segment segment))))
+      segment-list)))
+
+
+(def outline-painter
+  (segments-&gt;painter (list (make-segment (make-vect 0 0) (make-vect 0 1))
+                           (make-segment (make-vect 0 1) (make-vect 1 0))
+                           (make-segment (make-vect 1 1) (make-vect 0 -1))
+                           (make-segment (make-vect 1 0) (make-vect -1 0)))))
+
+(def x-painter
+  (segments-&gt;painter (list (make-segment (make-vect 0 0) (make-vect 1 1))
+                           (make-segment (make-vect 0 1) (make-vect 1 -1)))))
+
+(def diamond-painter
+  (segments-&gt;painter (list (make-segment (make-vect 0 0.5) (make-vect 0.5 0.5))
+                           (make-segment (make-vect 0.5 1) (make-vect 0.5 -0.5))
+                           (make-segment (make-vect 1 0.5) (make-vect -0.5 -0.5))
+                           (make-segment (make-vect 0.5 0) (make-vect -0.5 0.5)))))
+
+(def wave-painter
+  (segments-&gt;painter (list (make-segment (make-vect 0 0.85) (make-vect 0.15 -0.25))
+                           (make-segment (make-vect 0.15 0.6) (make-vect 0.15 0.05))
+                           (make-segment (make-vect 0.3 0.65) (make-vect 0.1 0))
+                           (make-segment (make-vect 0.4 0.65) (make-vect -0.05 0.2))
+                           (make-segment (make-vect 0.35 0.85) (make-vect 0.05 0.15))
+                           (make-segment (make-vect 0.6 1) (make-vect 0.05 -0.15))
+                           (make-segment (make-vect 0.65 0.85) (make-vect -0.05 -0.2))
+                           (make-segment (make-vect 0.6 0.65) (make-vect 0.15 0))
+                           (make-segment (make-vect 0.75 0.65) (make-vect 0.25 -0.3))
+                           (make-segment (make-vect 1 0.15) (make-vect -0.4 0.35))
+                           (make-segment (make-vect 0.6 0.5) (make-vect 0.15 -0.5))
+                           (make-segment (make-vect 0.6 0) (make-vect -0.1 0.3))
+                           (make-segment (make-vect 0.5 0.3) (make-vect -0.1 -0.3))
+                           (make-segment (make-vect 0.25 0) (make-vect 0.1 0.5))
+                           (make-segment (make-vect 0.35 0.5) (make-vect -0.05 0.1))
+                           (make-segment (make-vect 0.3 0.6) (make-vect -0.15 -0.2))
+                           (make-segment (make-vect 0.15 0.4) (make-vect -0.15 0.25)))))
+</pre>
+
+<h3>Exercise 2.50</h3>
+
+<pre>
+(defn transform-painter
+  "transform painter by mapping into a different frame"
+  [painter origin corner1 corner2]
+  (fn [frame]
+    (let [m (frame-coord-map frame) new-origin (m origin)]
+      (painter
+        (make-frame new-origin
+                    (sub-vect (m corner1) new-origin)
+                    (sub-vect (m corner2) new-origin))))))
+
+(defn flip-horiz
+  "flip painter horizontally"
+  [painter]
+  (transform-painter painter
+                     (make-vect 1.0 0.0)
+                     (make-vect 0.0 0.0)
+                     (make-vect 1.0 1.0)))
+
+(defn rotate180
+  "rotate (square) painter 180 degrees counterclockwise"
+  [painter]
+  (transform-painter painter
+                     (make-vect 1.0 1.0)
+                     (make-vect 0.0 1.0)
+                     (make-vect 1.0 0.0)))
+
+(defn rotate270
+  "rotate (square) painter 270 degrees counterclockwise"
+  [painter]
+  (transform-painter painter
+                     (make-vect 0.0 1.0)
+                     (make-vect 0.0 0.0)
+                     (make-vect 1.0 1.0)))
+</pre>
+
+
+<h3>Exercise 2.51</h3>
+
+<pre>
+(defn below1
+  "create composite painter out of 2 other painters, painting first below 2nd"
+  [painterB painterT]
+  (let [split-point (make-vect 0.0 0.5)
+        paint-top (transform-painter painterT
+                                     split-point
+                                     (make-vect 1.0 0.0)
+                                     (make-vect 0.0 1.0))
+        paint-bottom (transform-painter painterB
+                                        (make-vect 0.0 0.0)
+                                        (make-vect 1.0 0.0)
+                                        split-point)]
+    (fn [frame]
+      (paint-top frame)
+      (paint-bottom frame))))
+
+(defn below2
+  "create composite painter out of 2 other painters, painting first below 2nd"
+  [painterB painterT]
+  (rotate90 (beside (rotate270 painterB) (rotate270 painterT))))
+</pre>
+
+
+<h3>Exercise 2.52</h3>
+
+<pre>
+(defn corner-split
+  [painter n]
+  (if (= n 0)
+      painter
+      (let [up (up-split painter (dec n))
+            right (right-split painter (dec n))
+            top-left (beside up up)
+            bottom-right (below right right)
+            corner (corner-split painter (dec n))]
+        (beside (below painter top-left)
+                (below bottom-right corner)))))
+
+(defn flip-vert
+  [painter]
+  (transform-painter painter
+                     (make-vect 0.0 1.0)
+                     (make-vect 1.0 1.0)
+                     (make-vect 0.0 0.0)))
+
+(defn flip-horiz
+  [painter]
+  (transform-painter painter
+                     (make-vect 1.0 0.0)
+                     (make-vect 0.0 0.0)
+                     (make-vect 1.1 1.1)))
+
+
+(def wave-with-smile-painter
+  (segments-&gt;painter (list (make-segment (make-vect 0 0.85) (make-vect 0.15 -0.25))
+                           (make-segment (make-vect 0.15 0.6) (make-vect 0.15 0.05))
+                           (make-segment (make-vect 0.3 0.65) (make-vect 0.1 0))
+                           (make-segment (make-vect 0.4 0.65) (make-vect -0.05 0.2))
+                           (make-segment (make-vect 0.35 0.85) (make-vect 0.05 0.15))
+                           (make-segment (make-vect 0.6 1) (make-vect 0.05 -0.15))
+                           (make-segment (make-vect 0.65 0.85) (make-vect -0.05 -0.2))
+                           (make-segment (make-vect 0.6 0.65) (make-vect 0.15 0))
+                           (make-segment (make-vect 0.75 0.65) (make-vect 0.25 -0.3))
+                           (make-segment (make-vect 1 0.15) (make-vect -0.4 0.35))
+                           (make-segment (make-vect 0.6 0.5) (make-vect 0.15 -0.5))
+                           (make-segment (make-vect 0.6 0) (make-vect -0.1 0.3))
+                           (make-segment (make-vect 0.5 0.3) (make-vect -0.1 -0.3))
+                           (make-segment (make-vect 0.25 0) (make-vect 0.1 0.5))
+                           (make-segment (make-vect 0.35 0.5) (make-vect -0.05 0.1))
+                           (make-segment (make-vect 0.3 0.6) (make-vect -0.15 -0.2))
+                           (make-segment (make-vect 0.15 0.4) (make-vect -0.15 0.25))
+                           (make-segment (make-vect 0.4 0.85) (make-vect 0.05 -0.1))
+                           (make-segment (make-vect 0.45 0.75) (make-vect 0.1 0))
+                           (make-segment (make-vect 0.55 0.75) (make-vect 0.05 0.1)))))
+
+(defn corner-split-new
+  "corner split, revised for exercise 2.52"
+  [painter n]
+  (if (= n 0)
+      painter
+      (let [up (up-split painter (dec n))
+            right (right-split painter (dec n))
+            corner (corner-split painter (dec n))]
+        (beside (below painter up)
+                (below right corner)))))
+
+
+(defn square-of-four
+  [tl tr bl br]
+  (fn [painter]
+    (let [top (beside (tl painter) (tr painter))
+          bottom (beside (bl painter) (br painter))]
+      (below bottom top))))
+
+(defn square-limit-new
+  "square-limit, revised for exercise 2.52 to make Mr. Rogers look out corners"
+  [painter n]
+  (let [combine4 (square-of-four flip-vert rotate180
+                                 identity  flip-horiz)]
+    (combine4 (corner-split painter n))))
+</pre>
+
+<h3>Exercise 2.53</h3>
+
+<pre>
+(defn memq
+  [item x]
+  (cond (empty? x) false
+        (= item (first x)) x
+        :else (memq item (rest x))))
+</pre>
+
+(list 'a 'b 'c) causes interpreter to print: (a b c)<br />
+(list (list 'george)) causes interpreter to print: ((george))<br />
+(rest '((x1 x2) (y1 y2))) causes interpreter to print: ((y1 y2))<br />
+(second '((x1 x2) (y1 y2))) causes interpret to print: (y1 y2)<br />
+(pair? (car '(a short list))) cannot be directly translated to Clojure<br />
+(memq 'red '((red shoes) (blue socks))) causes interpreter to print: false<br />
+(memq 'red '(red shoes blue socks)) causes interpreter to print: (red shoes blue socks)<br />
+
+
+<h3>Exercise 2.54</h3>
+
+<pre>
+(defn equal?
+  [a b]
+  (let [firsta (first a) firstb (first b)]
+    (cond (and (empty? a) (empty? b)) true
+          (or (empty? a) (empty? b)) false
+          (and (list? firsta) (list? firstb))
+            (and (= (first firsta) (first firstb))
+                 (equal? (rest firsta) (rest firstb)))
+          (or (list? firsta) (list? firstb)) false
+          :else (and (= firsta firstb) (equal? (rest a) (rest b))))))
+</pre>
+
+<h3>Exercise 2.55</h3>
+
+(first ''abracadabra) is interpreted by the interpreter as<br />
+(first (quote (quote abracadabra)))
+or, alternately
+(first '(quote abracadabra))
+
+So first is applied to the quoted list, and of course returns the first atom, quote.
+
+
+<h3>Exercise 2.56</h3>
+
+<pre>
+(def variable? symbol?)
+(defn same-variable? [v1 v2]
+  (and variable? v1) (variable? v2) (= v1 v2))
+(defn =number? [exp num] (and (number? exp) (= exp num)))
+(defn make-sum
+  [a1 a2]
+  (cond (=number? a1 0) a2
+        (=number? a2 0) a1
+        (and (number? a1) (number? a2)) (+ a1 a2)
+        :else (list '+ a1 a2)))
+
+(defn make-product
+  [m1 m2]
+  (cond (or (=number? m1 0) (=number? m2 0)) 0
+        (=number? m1 1) m2
+        (=number? m2 1) m1
+        (and (number? m1) (number? m2)) (* m1 m2)
+        :else (list '* m1 m2)))
+
+(defn sum? [x] (and (list? x) (= (first x) '+)))
+(def addend second)
+(defn augend [s] (nth s 2))
+(defn product? [x] (and (list? x) (= (first x) '*)))
+(def multiplier second)
+(defn multiplicand [p] (nth p 2))
+(defn error [msg & rst] (throw (new Exception (str msg (print-str rst)))))
+
+(defn exponentiation? [x] (and (list? x) (= (first x) '**)))
+(defn make-exponentiation
+  [b e]
+  (cond (=number? e 0) 1
+        (=number? e 1) b
+        :else (list '** b e)))
+(def base second)
+(defn exponent [x] (nth x 2))
+
+(defn deriv
+  "Perform symbolic differentiation of expression, returning derivative w/ respect to specified var"
+  [exp var]
+  (cond (number? exp) 0
+        (variable? exp) (if (same-variable? exp var) 1 0)
+        (sum? exp) (make-sum (deriv (addend exp) var)
+                             (deriv (augend exp) var))
+        (product? exp) (make-sum (make-product (multiplier exp)
+                                               (deriv (multiplicand exp) var))
+                                 (make-product (deriv (multiplier exp) var)
+                                               (multiplicand exp)))
+        (exponentiation? exp)
+          (make-product (make-product (exponent exp)
+                                      (make-exponentiation (base exp) (make-sum (exponent exp) -1)))
+                        (deriv (base exp) var))
+        :else (error "unknown expression type -- DERIV" exp)))
+</pre>
+
+
+For the following couple exercises, assuming we don't have exponentiation, but just addition and multiplication, as the text seems to imply.<br />
+
+<h3>Exercise 2.57</h3>
+
+<pre>
+(defn make-sum-simple
+  [a1 a2]
+  (cond (=number? a1 0) a2
+        (=number? a2 0) a1
+        (and (number? a1) (number? a2)) (+ a1 a2)
+        :else (list '+ a1 a2)))
+
+(defn make-sum
+  [&amp; rst]
+  (defn make-sumR
+    [l]
+    (cond (= 2 (length l)) (make-sum-simple (first l) (second l))
+          :otherwise (make-sum-simple (first l) (make-sumR (rest l)))))
+  (make-sumR rst))
+
+(defn make-product-simple
+  [m1 m2]
+  (cond (or (=number? m1 0) (=number? m2 0)) 0
+        (=number? m1 1) m2
+        (=number? m2 1) m1
+        (and (number? m1) (number? m2)) (* m1 m2)
+        :else (list '* m1 m2)))
+
+(defn make-product
+  [&amp; rst]
+  (defn make-productR
+    [l]
+    (cond (= 2 (length l)) (make-product-simple (first l) (second l))
+          :otherwise (make-product-simple (first l) (make-productR (rest l)))))
+  (make-productR rst))
+
+(defn sum? [x] (and (seq? x) (= (first x) '+)))
+(def addend second)
+(defn augend [x] (if (&gt; (length x) 3) (cons '+ (drop 2 x)) (nth x 2)))
+(defn product? [x] (and (seq? x) (= (first x) '*)))
+(def multiplier second)
+(defn multiplicand [x] (if (&gt; (length x) 3) (cons '* (drop 2 x)) (nth x 2)))
+</pre>
+
+
+<h3>Exercise 2.58</h3>
+
+a.
+<pre>
+(defn make-sum
+  [a1 a2]
+  (cond (=number? a1 0) a2
+        (=number? a2 0) a1
+        (and (number? a1) (number? a2)) (+ a1 a2)
+        :else (list a1 '+ a2)))
+
+(defn make-product
+  [m1 m2]
+  (cond (or (=number? m1 0) (=number? m2 0)) 0
+        (=number? m1 1) m2
+        (=number? m2 1) m1
+        (and (number? m1) (number? m2)) (* m1 m2)
+        :else (list m1 '* m2)))
+
+(defn sum? [x] (and (seq? x) (= (second x) '+)))
+(def addend first)
+(defn augend [x] (nth x 2))
+(defn product? [x] (and (seq? x) (= (second x) '*)))
+(def multiplier first)
+(defn multiplicand [x] (nth x 2))
+</pre>
+
+part b:
+<pre>
+(defn make-sum-simple
+  [a1 a2]
+  (cond (=number? a1 0) a2
+        (=number? a2 0) a1
+        (and (number? a1) (number? a2)) (+ a1 a2)
+        :else (list a1 '+ a2)))
+
+(defn make-sum
+  [&amp; rst]
+  (defn make-sumR
+    [l]
+    (cond (= 2 (length l)) (make-sum-simple (first l) (second l))
+          :otherwise (make-sum-simple (first l) (make-sumR (rest l)))))
+  (make-sumR rst))
+
+(defn make-product-simple
+  [m1 m2]
+  (cond (or (=number? m1 0) (=number? m2 0)) 0
+        (=number? m1 1) m2
+        (=number? m2 1) m1
+        (and (number? m1) (number? m2)) (* m1 m2)
+        :else (list m1 '* m2)))
+
+(defn make-product
+  [&amp; rst]
+  (defn make-productR
+    [l]
+    (cond (= 2 (length l)) (make-product-simple (first l) (second l))
+          :otherwise (make-product-simple (first l) (make-productR (rest l)))))
+  (make-productR rst))
+
+
+(defn sum? [x] (and (seq? x) (&gt; (length x) 2) (or (= (second x) '+) (sum? (drop 2 x)))))
+(defn addend [x] (if (= (second x) '+) (first x) (take-while (fn [l] (not= l '+)) x)))
+(defn augend [x] (if (= (length x) 3)
+                     (nth x 2)
+                     (let [rst (rest (drop-while (fn [l] (not= l '+)) x))]
+                       (if (= (length rst) 1) (first rst) rst))))
+
+(defn product? [x] (and (seq? x) (not (sum? x)) (= (second x) '*)))
+(def multiplier first)
+(defn multiplicand [x] (if (&gt; (length x) 3) (drop 2 x) (nth x 2)))
+</pre>
+
+
+<h3>Exercise 2.59</h3>
+
+<pre>
+(defn element-of-set?
+  "return whether x is a member of the set, using unordered list"
+  [x set]
+  (cond (empty? set) false
+        (= x (first set)) true
+        :otherwise (recur x (rest set))))
+
+(defn adjoin-set
+  "add x to set if it is not already a member, using unordered list"
+  [x set]
+  (if (element-of-set? x set)
+    set
+    (cons x set)))
+
+(defn intersection-set
+  "compute intersection of 2 sets using unordered lists"
+  [set1 set2]
+  (cond (or (empty? set1) (empty? set2)) '()
+        (element-of-set? (first set1) set2)
+          (cons (first set1)
+                (intersection-set (rest set1) set2))
+        :otherwise (intersection-set (rest set1) set2)))
+
+(defn union-set
+  "compute union of 2 sets using unordered lists"
+  [set1 set2]
+  (cond (empty? set1) set2
+        (empty? set2) set1
+        (element-of-set? (first set1) set2) (union-set (rest set1) set2)
+        :otherwise (cons (first set1)
+                         (union-set (rest set1) set2))))
+</pre>
+
+<h3>Exercise 2.60</h3>
+
+<pre>
+(defn element-of-set?
+  "return whether x is a member of the set, using unordered list"
+  [x set]
+  (cond (empty? set) false
+        (= x (first set)) true
+        :otherwise (recur x (rest set))))
+
+(def adjoin-set cons)
+
+(defn intersection-set
+  "compute intersection of 2 sets using unordered lists"
+  [set1 set2]
+  (cond (or (empty? set1) (empty? set2)) '()
+        (element-of-set? (first set1) set2)
+          (cons (first set1)
+                (intersection-set (rest set1) set2))
+        :otherwise (intersection-set (rest set1) set2)))
+
+(def union-set concat)
+</pre>
+
+
+Allowing duplicates, the implementations of element-of-set? and intersection-set are unchanged. Adjoin-set and union-set become primitive list operations cons and concat, and hence should operate in O(1) and O(N) time, respectively. If duplicates accumulate, however, N no longer reflects the size of the mathematical set abstraction, but rather the size of the underlying list, including the duplicates. So the speed of element-of-set?, intersection-set, and union-set will be adversely affected.<br />
+
+I might use this set representation in applications where it is not important to know the true size of the set, or ones where the queries are primarily checking for set membership, not interating over its members. In reality, I'd probably only use this in scenarios where I already know there are no duplicates because of the way the sets are built up. Even then I'd be more likely to use a bit array if the members are small natural numbers.
+
+<h3>Exercise 2.61</h3>
+
+<pre>
+(defn element-of-set?
+  "return whether x is a member of the set, using ordered list representation"
+  [x set]
+  (cond (empty? set) false
+        (= x (first set)) true
+        (&lt; x (first set)) false
+        :otherwise (recur x (rest set))))
+
+(defn intersection-set
+  "return intersection of two sets, using ordered list representation"
+  [set1 set2]
+  (if (or (empty? set1) (empty? set2))
+      '()
+      (let [x1 (first set1) x2 (first set2)]
+        (cond (= x1 x2) (cons x1 (intersection-set (rest set1) (rest set2)))
+              (&lt; x1 x2) (intersection-set (rest set1) set2)
+              :otherwise (intersection-set set1 (rest set2))))))
+
+(defn adjoin-set
+  "return adjoined-set produced from adding member to set if not present"
+  [x set]
+  (cond (empty? set) (list x)
+        (= x (first set)) set
+        (&gt; x (first set)) (cons (first set) (adjoin-set x (rest set)))
+        :otherwise (cons x set)))
+</pre>
+
+For the unordered representation, adjoin-set would visit every member of the list, for adjoining an element not present, and then 1 constant operation to prepend the element. For elements already present, it would visit half the list, on average, to determine that the element is already present, and then need no additional steps.<br />
+
+For the ordered representation, for adjoining an element not present, it would visit half the list, on average, before finding its insertion point, and then a constant operation to insert, so approximately half the number of steps compared to the unordered representation. For elements already present, though, it still visits half the list, on average, determining that the element is already present. So the "half as many steps" only applies to insertion of an element that is not already present.<br />
+
+
+<h3>Exercise 2.62</h3>
+
+<pre>
+(defn union-set
+  "produce union of two sets represented as ordered lists"
+  [set1 set2]
+  (cond (empty? set1) set2
+        (empty? set2) set1
+        :otherwise (let [x1 (first set1) x2 (first set2)]
+                     (cond (= x1 x2) (union-set (rest set1) set2)
+                           (&lt; x1 x2) (cons x1 (union-set (rest set1) set2))
+                           :otherwise (cons x2 (union-set set1 (rest set2)))))))
+</pre>
+
+The number of steps taken is equal to (a constant factor plus) the sum of the sizes of the 2 lists, since on each step 1 of the lists gets reduced in size by 1. So this executes in &theta;(n).
+
+
+<h3>Exercise 2.63</h3>
+
+I chose to use a node struct here, a little cleaner and probably faster.
+
+<pre>
+(defstruct node :left-branch :entry :right-branch)
+
+(def entry (accessor node :entry))
+(def left-branch (accessor node :left-branch))
+(def right-branch (accessor node :right-branch))
+(defn make-tree
+  "build a tree from its entry, left, and right branches"
+  [entry left right]
+  (struct node left entry right))
+
+(defn element-of-set?
+  [x set]
+  (cond (nil? set) false
+        (= x (entry set)) true
+        (&lt; x (entry set)) (element-of-set? x (left-branch set))
+        :otherwise (element-of-set? x (right-branch set))))
+
+(defn adjoin-set
+  [x set]
+  (cond (nil? set) (make-tree x nil nil)
+        (= x (entry set)) set
+        (&lt; x (entry set)) (make-tree (entry set)
+                                     (adjoin-set x (left-branch set))
+                                     (right-branch set))
+        :otherwise (make-tree (entry set)
+                              (left-branch set)
+                              (adjoin-set x (right-branch set)))))
+
+(defn tree-&gt;list-1
+  [tree]
+  (if (nil? tree)
+      '()
+      (concat (tree-&gt;list-1 (left-branch tree))
+              (cons (entry tree)
+                    (tree-&gt;list-1 (right-branch tree))))))
+
+(defn tree-&gt;list-2
+  [tree]
+  (defn copy-to-list [tree result-list]
+    (if (nil? tree)
+        result-list
+        (recur (left-branch tree)
+               (cons (entry tree)
+               (copy-to-list (right-branch tree)
+                             result-list)))))
+  (copy-to-list tree '()))
+</pre>
+
+Assuming there are no side-effects, and the trees are all well-formed, both procedures should return the same result for every tree: an ordered list of the contents of the tree. An ordered list of integers can be represented with a number of tree shapes, however, these multiple tree shapes all map back to the same identical ordered list of integers.
+
+tree-&gt;list-2 has a slower order of growth of stack memory, compared to tree-&gt;list-1. tree-&gt;list-1 has a deferred concat that must occur on every level, so it cannot benefit from tail call optimization. tree-&gt;list-2 cannot fully benefit from tail call optimization since there are 2 trees to recurse down in the general case, however it does perform tail call optimization on the left subtree, so it should have a slower memory growth rate, especially if the tree is unbalanced towards the left.
+
+Both processes should have the same &theta;(n) growth rate in terms of number of steps required, however.
+
+
+<h3>Exercise 2.64</h3>
+
+<pre>
+(defn partial-tree
+  [elts n]
+  (if (= n 0)
+      (cons nil elts)
+      (let [left-size (quot (dec n) 2)
+            left-result (partial-tree elts left-size)
+            left-tree (first left-result)
+            non-left-elts (rest left-result)
+            right-size (- n (inc left-size))
+            this-entry (first non-left-elts)
+            right-result (partial-tree (rest non-left-elts) right-size)
+            right-tree (first right-result)
+            remaining-elts (rest right-result)]
+        (cons (make-tree this-entry left-tree right-tree) remaining-elts))))
+
+(defn list-&gt;tree [elements]
+  (first (partial-tree elements (length elements))))
+</pre>
+
+This works via recursive calls to partial-tree. At each level in partial-tree, it further partitions its partition of the list, by subtracting out one for the node entry and evenly dividing the remainder as closely as possible between left and right branches, for which it further calls down into partial-tree, passing the new (sub-)partitions, and then building the result tree from the results of these recursive calls, along with the entry element.<br />
+
+list-&gt;tree produces for list (1 3 5 7 9 11) a tree with this structure:
+
+<pre>
+     5
+    / \
+   /   \
+  /     \
+ 1       9
+  \     / \
+   3   7   11
+</pre>
+
+The order of growth in the number of steps required by list-&gt;tree to convert n elements is &theta;(n). Each element is processed exactly once, and everything else are constant factors.
+
+
+<h3>Exercise 2.65</h3>
+
+<pre>
+(defn union-ordered-list
+  "produce union of two sets represented as ordered lists"
+  [set1 set2]
+  (cond (empty? set1) set2
+        (empty? set2) set1
+        :otherwise (let [x1 (first set1) x2 (first set2)]
+                     (cond (= x1 x2) (union-ordered-list (rest set1) set2)
+                           (&lt; x1 x2) (cons x1 (union-ordered-list (rest set1) set2))
+                           :otherwise (cons x2 (union-ordered-list set1 (rest set2)))))))
+
+
+(defn intersection-ordered-list
+  "return intersection of two sets, using ordered list representation"
+  [set1 set2]
+  (if (or (empty? set1) (empty? set2))
+      '()
+      (let [x1 (first set1) x2 (first set2)]
+        (cond (= x1 x2) (cons x1 (intersection-ordered-list (rest set1) (rest set2)))
+              (&lt; x1 x2) (intersection-ordered-list (rest set1) set2)
+              :otherwise (intersection-ordered-list set1 (rest set2))))))
+
+(defn union-set
+  "order-N union of 2 sets implemented as balanced binary trees"
+  [set1 set2]
+  (let [l1 (tree-&gt;list-2 set1) l2 (tree-&gt;list-2 set2)]
+    (list-&gt;tree (union-ordered-list l1 l2))))
+
+(defn intersection-set
+  "order-N intersection of 2 sets implemented as balanced binary trees"
+  [set1 set2]
+  (let [l1 (tree-&gt;list-2 set1) l2 (tree-&gt;list-2 set2)]
+    (list-&gt;tree (intersection-ordered-list l1 l2))))
+
+</pre>
+
+
+This uses the &theta;(n) results from several previous exercises, including the functions to compute intersection and union of sets represented as ordered lists. So we transform the balanced tree representation into ordered list representation using a &theta;(n) function, perform the intersection or union on these ordered lists using a &theta;(n) function, and then transform the resulting ordered list back into a balanced binary tree via another &theta;(n) function. The result of a constant number of &theta;(n) functions is itself &theta;(n).
+
+
+<h3>Exercise 2.66</h3>
+
+Using getKey instead of key because key is already reserved in core Clojure.
+
+<pre>
+(defn lookup
+  "lookup key in a set of records, structured as a binary tree"
+  [given-key set-of-records]
+  (cond (nil? set-of-records) false
+        (= given-key (getKey (entry set-of-records))) (entry set-of-records)
+        (&lt; given-key (getKey (entry set-of-records))) (recur given-key (left-branch set-of-records))
+        :otherwise (recur given-key (right-branch set-of-records))))
+</pre>
+
+
+<h3>Exercise 2.67</h3>
+
+Back to using simple list representations for the Huffman exercises.
+
+<pre>
+(defn make-leaf [symbol weight] (list 'leaf symbol weight))
+(defn leaf? [object] (= (first object) 'leaf))
+(defn symbol-leaf [x] (second x))
+(defn weight-leaf [x] (nth x 2))
+
+(def left-branch first)
+(def right-branch second)
+(defn symbols
+  "return symbols for a Huffman tree"
+  [tree]
+  (if (leaf? tree)
+      (list (symbol-leaf tree))
+      (nth tree 2)))
+
+(defn weight
+  "return weight for a Huffman tree"
+  [tree]
+  (if (leaf? tree)
+      (weight-leaf tree)
+      (nth tree 3)))
+
+(defn make-code-tree
+  "make a Huffman tree by joining left and right subtrees"
+  [left right]
+  (list left
+        right
+        (concat (symbols left) (symbols right))
+        (+ (weight left) (weight right))))
+
+(defn choose-branch
+  [bit branch]
+  (cond (= bit 0) (left-branch branch)
+        (= bit 1) (right-branch branch)
+        :otherwise (error "bad bit -- CHOOSE-BRANCH" bit)))
+
+(defn decode
+  "decode stream of 1s and 0s using the supplied Huffman tree"
+  [bits tree]
+  (defn decode-1
+    [bits current-branch]
+    (if (empty? bits)
+        '()
+        (let [next-branch (choose-branch (first bits) current-branch)]
+          (if (leaf? next-branch)
+              (cons (symbol-leaf next-branch)
+                    (decode-1 (rest bits) tree))
+              (decode-1 (rest bits) next-branch)))))
+  (decode-1 bits tree))
+
+(defn adjoin-set
+  [x set]
+  (cond (empty? set) (list x)
+        (&lt; (weight x) (weight (first set))) (cons x set)
+        :otherwise (cons (first set)
+                         (adjoin-set x (rest set)))))
+
+(defn make-leaf-set
+  [pairs]
+  (if (empty? pairs)
+      '()
+      (let [pair (first pairs)]
+        (adjoin-set (make-leaf (first pair) (second pair))
+                    (make-leaf-set (rest pairs))))))
+
+(def sample-tree
+  (make-code-tree (make-leaf 'A 4)
+                  (make-code-tree
+                    (make-leaf 'B 2)
+                    (make-code-tree (make-leaf 'D 1)
+                                    (make-leaf 'C 1)))))
+(def sample-message '(0 1 1 0 0 1 0 1 0 1 1 1 0))
+</pre>
+
+This sample message+tree produces (A D A B B C A) when sent through the decoder.
+
+<h3>Exercise 2.68</h3>
+
+<pre>
+(defn symbol-member
+  "return whether a symbol is a member of a specified list of symbols"
+  [symbol symbols]
+  (cond (empty? symbols) false
+        (= symbol (first symbols)) true
+        :otherwise (recur symbol (rest symbols))))
+
+(defn encode-symbol
+  "encode a single symbol using the specified Huffman tree"
+  [symbol tree]
+  (if (not (symbol-member symbol (symbols tree)))
+      (error "Invalid symbol not contained in tree--" symbol)
+      (if (leaf? tree)
+          '()
+          (if (symbol-member symbol (symbols (left-branch tree)))
+              (cons 0 (encode-symbol symbol (left-branch tree)))
+              (cons 1 (encode-symbol symbol (right-branch tree)))))))
+          
+(defn encode
+  "encode a message using the specified Huffman tree"
+  [message tree]
+  (if (empty? message)
+      '()
+      (concat (encode-symbol (first message) tree)
+              (encode (rest message) tree))))
+
+
+user=&gt; (encode '(A D A B B C A) sample-tree)
+(0 1 1 0 0 1 0 1 0 1 1 1 0)
+
+</pre>
+
+The resulting encoding does exactly match the code given in exercise 2.67.
+
+<h3>Exercise 2.69</h3>
+
+<pre>
+(defn successive-merge
+  "perform successive merge of smallest weight nodes to build up Huffman tree"
+  [leaves]
+  (cond (empty? leaves) nil
+        (= (length leaves) 1) (first leaves)
+        :otherwise (recur (adjoin-set (make-code-tree (first leaves) (second leaves))
+                                      (drop 2 leaves)))))
+
+(defn generate-huffman-tree
+  "generate Huffman tree from a list of symbol-frequency pairs"
+  [pairs]
+  (successive-merge (make-leaf-set pairs)))
+</pre>
+
+
+<h3>Exercise 2.70</h3>
+
+<pre>
+(def sample-tree2_70
+  (generate-huffman-tree (list '(A 2) '(BOOM 1) '(GET 2) '(JOB 2)
+                               '(NA 16) '(SHA 3) '(YIP 9) '(WAH 1))))
+
+(def sample-coding2_70
+  (encode (list 'GET 'A 'JOB
+                'SHA 'NA 'NA 'NA 'NA 'NA 'NA 'NA 'NA
+                'GET 'A 'JOB
+                'SHA 'NA 'NA 'NA 'NA 'NA 'NA 'NA 'NA
+                'WAH 'YIP 'YIP 'YIP 'YIP 'YIP 'YIP 'YIP 'YIP 'YIP
+                'SHA 'BOOM)
+          sample-tree2_70))
+
+user=&gt; sample-coding2_70
+(1 1 1 1 1 1 1 0 0 1 1 1 1 0 1 1 1 0 0 0 0 0 0 0 0 0 1 1 1 1 1 1 1 0 0 1 1 1 1 0
+ 1 1 1 0 0 0 0 0 0 0 0 0 1 1 0 1 0 1 0 1 0 1 0 1 0 1 0 1 0 1 0 1 0 1 0 1 1 1 0 1
+ 1 0 1 1)
+
+user=&gt; sample-tree2_70
+((leaf NA 16) ((leaf YIP 9) (((leaf A 2) ((leaf WAH 1) (leaf BOOM 1) (WAH BOOM)
+2) (A WAH BOOM) 4) ((leaf SHA 3) ((leaf JOB 2) (leaf GET 2) (JOB GET) 4) (SHA JO
+B GET) 7) (A WAH BOOM SHA JOB GET) 11) (YIP A WAH BOOM SHA JOB GET) 20) (NA YIP
+A WAH BOOM SHA JOB GET) 36)
+
+</pre>
+
+Coding this message using the Huffman tree generated by the specified symbol-frequency pairs produced an 84 bit message. Encoding this message via a fixed-length code, we'd use 3 bits per symbol to encode the 8 symbols (assuming the message length is specified externally, not using any delimiter). Therefore this 36-symbol message would require a minimum of 108 bits, using a fixed-length code.
+
+
+
+<h3>Exercise 2.71</h3>
+
+The Huffman tree for an alphabet of n symbols with weights 1, 2, 4, ... 2<sup>n-1</sup> will tend to be linear, down one branch, with all the symbols hanging off the opposite branch. For n = 5,
+
+<pre>
+
+                31
+                /\
+               /  \
+             15    16
+             /\
+            /  \
+           7    8
+          / \
+         /   \
+        3     4
+       / \
+      /   \
+     1     2
+</pre>
+
+For n = 10,
+
+<pre>
+                               1023
+                               / \
+                              /   \
+                            511   512
+                            / \
+                           /   \
+                         255   256
+                         / \
+                        /   \
+                      127   128
+                      / \
+                     /   \
+                   63     64
+                   /\ 
+                  /  \
+                31    32
+                /\
+               /  \
+             15    16
+             /\
+            /  \
+           7    8
+          / \
+         /   \
+        3     4
+       / \
+      /   \
+     1     2
+</pre>
+
+In such trees, only 1 bit is required to encode the most frequent symbol, and n-1 bits are required to encode the 2 least frequent symbols.
+
+
+<h3>Exercise 2.72</h3>
+
+With the relative frequencies from exercise 2.71, for the most frequent symbol, the growth rate varies as &theta;(n) with the number of symbols, since it has to check the full symbol list at the root, and then checks the almost-full symbol list again on the left branch. For the least frequent symbol, the growth rate varies as &theta;(n), since there are approximately n levels in the tree, and at each level, the symbol is found in 1 step.
+
+
+<h3>Exercise 2.73</h3>
+
+<pre>
+(def *dispatch-map* (hash-map))
+(defn build-key [op type] (str op "|" type))
+
+(defn putOp [op type item]
+  (def *dispatch-map* (assoc *dispatch-map* (build-key op type) item)))
+
+(defn getOp [op type]
+  (get *dispatch-map* (build-key op type)))
+
+(defn square [x] (* x x))
+
+(defn attach-tag [type-tag contents] (cons type-tag contents))
+(defn type-tag [datum]
+  (if (list? datum)
+      (first datum)
+      (error "Bad tagged datum -- TYPE-TAG" datum)))
+(defn contents [datum]
+  (if (list? datum)
+      (second datum)
+      (error "Bad tagged datum -- CONTENTS" datum)))
+
+(defn install-rectangular-package []
+  ;; internal procedures
+  (defn real-part [z] (first z))
+  (defn imag-part [z] (second z))
+  (defn make-from-real-imag [x y] (list x y))
+  (defn magnitude [z]
+    (Math/sqrt (+ (square (real-part z))
+             (square (imag-part z)))))
+  (defn angle [z] (Math/atan2 (imag-part z) (real-part z)))
+  (defn make-from-mag-ang [r a] (list (* r (Math/cos a)) (* r (Math/sin a))))
+  ;; interface to the rest of the system
+  (defn tag [x] (attach-tag 'rectangular x))
+  (putOp 'real-part '(rectangular) real-part)
+  (putOp 'imag-part '(rectangular) imag-part)
+  (putOp 'magnitude '(rectangular) magnitude)
+  (putOp 'angle '(rectangular) angle)
+  (putOp 'make-from-real-imag 'rectangular (fn [x y] (tag (make-from-real-imag x y))))
+  (putOp 'make-from-mag-ang 'rectangular (fn [r a] (tag (make-from-mag-ang r a)))))
+
+
+(defn install-polar-package []
+  ;; internal procedures
+  (defn magnitude [z] (first z))
+  (defn angle [z] (second z))
+  (defn make-from-mag-ang [r a] (list r a))
+  (defn real-part [z] (* (magnitude z) (Math/cos (angle z))))
+  (defn imag-part [z] (* (magnitude z) (Math/sin (angle z))))
+  (defn make-from-real-imag [x y] (list (Math/sqrt (+ (square x) (square y)))
+                                        (Math/atan2 y x)))
+  ;; interface to the rest of the system
+  (defn tag [x] (attach-tag 'polar x))
+  (putOp 'real-part '(polar) real-part)
+  (putOp 'imag-part '(polar) imag-part)
+  (putOp 'magnitude '(polar) magnitude)
+  (putOp 'angle '(polar) angle)
+  (putOp 'make-from-real-imag 'polar (fn [x y] (tag (make-from-real-imag x y))))
+  (putOp 'make-from-mag-ang 'polar (fn [r a] (tag (make-from-mag-ang r a)))))
+
+(defn operator [exp] (first exp))
+(defn operands [exp] (rest exp))
+(defn deriv [exp var]
+  (cond (number? exp) 0
+        (variable? exp) (if (same-variable? exp var) 1 0)
+        :else ((getOp 'deriv (operator exp)) (operands exp) var)))
+
+(defn install-deriv-package []
+  ;; internal procedures
+  (defn =number? [exp num] (and (number? exp) (= exp num)))
+  (defn make-sum [a1 a2]
+    (cond (=number? a1 0) a2
+          (=number? a2 0) a1
+          (and (number? a1) (number? a2)) (+ a1 a2)
+          :else (list '+ a1 a2)))
+  (def addend first)
+  (def augend second)
+  (defn make-product [m1 m2]
+    (cond (or (=number? m1 0) (=number? m2 0)) 0
+          (=number? m1 1) m2
+          (=number? m2 1) m1
+          (and (number? m1) (number? m2)) (* m1 m2)
+          :else (list '* m1 m2)))
+  (def multiplier first)
+  (def multiplicand second)
+  (defn make-exponentiation [b e]
+    (cond (=number? e 0) 1
+          (=number? e 1) b
+          :else (list '** b e)))
+  (def base first)
+  (def exponent second)
+
+  (defn deriv-sum [exp var] (make-sum (deriv (addend exp) var)
+                                      (deriv (augend exp) var)))
+  (defn deriv-product [exp var]
+    (make-sum
+      (make-product (multiplier exp)
+                    (deriv (multiplicand exp) var))
+      (make-product (deriv (multiplier exp) var)
+                    (multiplicand exp))))
+  (defn deriv-exponentiation [exp var]
+    (make-product (make-product (exponent exp)
+                                (make-exponentiation (base exp) (make-sum (exponent exp) -1)))
+                  (deriv (base exp) var)))
+
+  ;; interface to the rest of the system
+  (putOp 'deriv '+ deriv-sum)
+  (putOp 'deriv '* deriv-product)
+  (putOp 'deriv '** deriv-exponentiation))
+
+
+(defn apply-generic [op &amp; args]
+  (let [type-tags (map type-tag args)
+        proc (getOp op type-tags)]
+    (if proc
+      (apply proc (map contents args))
+      (error "No method for these types -- APPLY-GENERIC" (list op type-tags)))))
+
+(defn real-part [z] (apply-generic 'real-part z))
+(defn imag-part [z] (apply-generic 'imag-part z))
+(defn magnitude [z] (apply-generic 'magnitude z))
+(defn angle [z] (apply-generic 'angle z))
+
+(defn make-from-real-imag [x y]
+  ((getOp 'make-from-real-imag 'rectangular) x y))
+(defn make-from-mag-ang [r a]
+  ((getOp 'make-from-mag-ang 'polar) r a))
+</pre>
+
+Deriv was transformed into data-directed style by rewriting the basic derivative procedure to handle as special cases derivation of simple numbers and variables, and dispatch all other expressions to the dispatch table according to its operation. In this version, the operation is removed in the process of dispatch.
+
+Predicates number? and same-variable? and variable? cannot be assimilated into the data dispatch because these are special cases -- they are not prefixed with an operator tag, in the way that all the other dispatched operations are. So we handle these beforehand as special cases.
+
+If the order of the arguments to getOp were reversed, to (get (operator exp) 'deriv), then the arguments to putOp to insert the various deriv operations would need to have their first 2 arguments reversed, accordingly.
+
+
+
+
+<h3>Exercise 2.74</h3>
+
+<pre>
+(def *dispatch-map* (hash-map))
+(defn getKey [op type] (str op "|" type))
+
+(defn get-record
+  "return specified employee's record found from specified personnel file, if found, else nil"
+  [name personnel-file]
+  (let [record-type (first personnel-file)
+        contents (rest personnel-file)
+        lookup-key (getKey 'lookup-employee record-type)
+        lookupfn (get *dispatch-map* lookup-key)]
+    (lookupfn name contents)))
+
+
+(defn get-salary
+  "return salary from an employee's record, from any personnel file"
+  [rec]
+  (let [record-type (first rec)
+        contents (rest rec)
+        lookup-key (getKey 'lookup-salary record-type)
+        contents (rest rec)
+        lookupfn (get *dispatch-map* lookup-key)]
+    (lookupfn contents)))
+
+(defn find-employee-record
+  "search for employee record across all personnel files, if found, else nil"
+  [name personnel-files]
+  (if (empty? personnel-files)
+      nil
+      (let [file (first personnel-files)
+            rec (get-record name file)]
+        (if (nil? rec)
+            (recur name (rest personnel-files))
+            rec))))
+</pre>
+
+This implementation relies upon each personnel file being structured as a sequence with its first element being a type tag. Each division should install into the global *dispatch-map*, keyed by "op|type", the various operations applying to that type of personnel file and its related sub-records (e.g., employee record).
+When Insatiable takes over a new company, a new set of functions adhering to the standard interface need to be defined, for the new division, and an install package that installs these functions into the global *dispatch-map* under the correct corresponding keys. Also, the division personnel file will need to be added to the global list that find-employee-record gets called with (and that any other cross-division functions use).
+
+
+<h3>Exercise 2.75</h3>
+
+<pre>
+(defn make-from-mag-ang
+  "make complex number from its magnitude/angle, using message passing"
+  [mag ang]
+  (fn [op]
+    (cond (= op 'real-part) (* mag (Math/cos ang))
+          (= op 'imag-part) (* mag (Math/sin ang))
+          (= op 'magnitude) mag
+          (= op 'angle) ang
+          :else (error "Unknown op -- MAKE-FROM-MAG-ANG" op))))
+</pre>
+
+
+<h3>Exercise 2.76</h3>
+
+For systems employing generic operations with explicit dispatch, when we add new types, every one of the generic operations must be modified to add the appropriate handling for the new type. When we want to add a new operation to this system, it needs to have case handling for every existing type, to dispatch to the correct implementation for that type.
+
+For systems employing data-directed style, when we add new types, new implementation methods need to get written for each generic operation, and an install package needs to get written to add these all into the global dispatch map. When we add a new operation to this type of system, all the existing types need to have implementations created, and added to their install package.
+
+For systems employing message-passing style, when we add new types, their dispatch procedure needs to implement all the existing operations. When we add new operations, these need to get implemented as additions to the dispatch procedures for all the existing types.
+
+For systems in which new types must often be added, message-passing style seems most appropriate since adding new types is an additive operation. For systems in which new operations must often be added, generic operations with explicit dispatch seems the best choice, since again this is an additive procedure here.
+
+
+<h3>Exercise 2.77</h3>
+
+Alyssa's suggestion works because every operation defined in terms of apply-generic takes the type specifier from the front of the list and uses it to lookup the operation. So we can add the lookup for the complex magnitude, and it will in turn delegate to apply-generic magnitude again, peeling off the rectangle next time, calling apply-generic twice altogether.
+
+When magnitude is evaluated, (apply-generic 'magnitude z) is substituted. In the process of evaluating this, type-tags are generated by mapping function type-tag onto z, then getOp is called, passing in operation 'magnitude and the type-tags (complex). getOp returns function magnitude, which is bound to proc. apply-generic continues, applying proc (magnitude) to the result of applying "contents" to z (which produces (rectangular 3 4)). So the same outer magnitude, defined in terms of apply-generic gets called a second, inner time.
+
+When this inner call of magnitude is evaluated, (apply-generic 'magnitude (rectangular 3 4)) is substituted. In the process of evaluating this, type-tags are generated by mapping function type-tag to produce (rectangular), then getOp is called, passing in operation 'magnitude and the type-tag (rectangular). getOp returns private function magnitude, defined in the rectangular package, which is bound to proc. apply-generic continues, applying proc (magnitude) to the result of applying "contents", which produces (3 4).
+
+This innermost call of (rectangular) magnitude calls real-part and imag-part private functions to extract the 3 and 4, respectively, and calls square on each, then + on those results, and then finally passes that sum to sqrt.
+
+
+<h3>Exercise 2.78</h3>
+
+<pre>
+(defn attach-tag [type-tag contents]
+  (if (and (= type-tag 'clojure-number) (number? contents))
+      contents
+      (cons type-tag contents)))
+(defn type-tag [datum]
+  (cond (number? datum) 'clojure-number
+        (list? datum) (first datum)
+        :else (error "Bad tagged datum -- TYPE-TAG" datum)))
+ 
+(defn contents [datum]
+  (cond (number? datum) datum
+        (list? datum) (second datum)
+        :else (error "Bad tagged datum -- CONTENTS" datum)))
+</pre>
+
+<h3>Exercise 2.79</h3>
+
+<pre>
+;; to be included in the complex package
+(putOp 'equ? '(complex complex)
+  (fn [x y] (and (= (real-part x) (real-part y))
+                 (= (imag-part x) (imag-part y)))))
+
+;; to be included in the clojure-number package
+(putOp 'equ? '(clojure-number clojure-number)
+  (fn [x y] (= x y)))
+
+;; to be included in the rational package
+; assumes rationals always stored in normalized form
+(putOp 'equ? '(rational rational)
+  (fn [x y] (and (= (numer x) (numer y))
+                 (= (denom x) (denom y)))))
+
+
+(defn equ? [x y] (apply-generic 'equ? x y))
+</pre>
+
+
+<h3>Exercise 2.80</h3>
+
+<pre>
+;; to be included in the complex package
+(putOp '=zero? '(complex)
+  (fn [x] (and (= 0 (real-part x)) (= 0 (imag-part x)))))
+
+;; to be included in the clojure-number package
+(putOp '=zero? '(clojure-number)
+  (fn [x] (= 0 x)))
+
+;; to be included in the rational package
+; assumes 0/0 should not count as zero
+(putOp '=zero? '(rational)
+  (fn [x] (and (= (numer x) 0)
+               (not= (denom x) 0))))
+
+(defn =zero? [x] (apply-generic '=zero? x))
+</pre>
+
+
+<h3>Exercise 2.81</h3>
+
+With Louis' coercion procedures installed, if apply-generic is called with two arguments of type clojure-number or two arguments of type complex for an operation that is not found in the table for those types, it will go into an infinite loop. It will perform the dummy coercion from t1-&gt;t2 and then call back into apply-generic again with the coerced argument, doomed to repeat the same steps over and over again.
+
+Louis is not correct that arguments of the same type need to be coerced. If the arguments are of the same type, and a corresponding operation procedure is defined, the procedure is applied to the arguments. Otherwise, if no such procedure is defined, coercion is pointless and apply-generic correctly fails with a "No method" error.
+
+Modifying apply-generic to not try coercion if the two arguments have the same type:
+
+<pre>
+(defn apply-generic
+  [op &amp; args]
+  (let [type-tags (map type-tag args)
+        proc (getOp op type-tags)]
+    (if proc
+        (apply proc (map contents args))
+        (if (= (length args) 2)
+            (let [type1 (first type-tags)
+                  type2 (second type-tags)
+                  a1 (first args)
+                  a2 (second args)]
+              (if (= type1 type2)
+                  (error "No method for these types"
+                         (list op type-tags))
+                  (let [t1-&gt;t2 (get-coercion type1 type2)
+                        t2-&gt;t1 (get-coercion type2 type1)]
+                    (cond t1-&gt;t2 (apply-generic op (t1-&gt;t2 a1) a2)
+                          t2-&gt;t1 (apply-generic op a1 (t2-&gt;t1 a2))
+                          :else (error "No method for these types"
+                                       (list op type-tags))))))
+            (error "No method for these types"
+                   (list op type-tags))))))
+</pre>
+
+
+<h3>Exercise 2.82</h3>
+
+<pre>
+(defn apply-generic
+  [op &amp; args]
+  (let [type-tags (map type-tag args)
+        proc (getOp op type-tags)]
+    (if proc
+        (apply proc (map contents args))
+        (do (defn can-coerce-all-args [totype type-tags]
+              (cond (empty? type-tags) true
+                    (nil? (get-coercion (first type-tags) totype)) false
+                    :else (recur totype (rest type-tags))))
+            (defn coerce-args [totype type-tags args]
+              (cond (empty? args) '()
+                    (= totype (first type-tags))
+                      (cons (first args)
+                            (coerce-args totype (rest type-tags) (rest args)))
+                    :else (let [t1-&gt;t2 (get-coercion (first type-tags) totype)]
+                            (cons (t1-&gt;t2 (first args))
+                                  (coerce-args totype
+                                               (rest type-tags)
+                                               (rest args))))))
+            (defn try-coerce-args [type-tags args]
+              (defn try-coerceR [totype-list type-tags args]
+                (cond (empty? totype-list) nil
+                      (can-coerce-all-args (first totype-list) type-tags)
+                        (coerce-args (first totype-list) type-tags args)
+                      :else (recur (rest totype-list) type-tags args)))
+              (try-coerceR type-tags type-tags args))
+            (let [coerced (try-coerce-args type-tags args)]
+              (if (nil? coerced)
+                  (error "No method for these types"
+                         (list op type-tags))
+                  (eval (concat '(apply-generic op) coerced))))))))
+</pre>
+
+This wouldn't handle every possible case. For example, if there is an operation defined to raise a real number to an integral power, and we pass in two integers, trying to coerce both integers to real numbers would still not match the operation. In order to correctly handle situations such as this, we would have to try all combinations of coercion (not just all-arguments-the-same) to see if any yield a match from the dispatch table.
+
+<h3>Exercise 2.83</h3>
+
+<pre>
+;; to be included in the clojure-number package
+(putOp 'raise '(clojure-number)
+  (fn [x] (make-rational x 1)))
+
+;; to be included in the rational package
+(putOp 'raise '(rational)
+  (fn [x] (make-real x)))
+
+;; to be included in the real package
+(putOp 'raise '(real)
+  (fn [x] (make-from-real-imag x 0)))
+
+(defn raise [x]
+  (apply-generic 'raise x))
+</pre>
+
+
+<h3>Exercise 2.84</h3>
+
+<pre>
+(defn height-of-type [x]
+  (let [type (type-tag x)]
+    (cond (= type 'clojure-number) 1.0
+          (= type 'rational) 2.0
+          (= type 'real) 3.0
+          (= type 'complex) 4.0
+          :else (error "unhandled type" (list x)))))
+
+(defn raise-to-height
+  "raise x to the specified height, if below, via coercion"
+  [x height]
+  (if (&lt; (height-of-type x) height)
+      (recur (raise x) height)
+      x))
+
+(defn apply-generic
+  [op &amp; args]
+  (let [type-tags (map type-tag args)
+        proc (getOp op type-tags)]
+    (if proc
+        (apply proc (map contents args))
+        (let [maxheight (max (map height-of-type type-tags))
+              coerced (map (fn [x] (raise-to-height x maxheight)))]
+          (if (nil? coerced)
+              (error "No method for these types"
+                     (list op type-tags))
+              (eval (concat '(apply-generic op) coerced)))))))
+</pre>
+

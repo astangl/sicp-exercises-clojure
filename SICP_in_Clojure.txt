@@ -1,0 +1,1258 @@
+Exercise 1.1
+
+10
+12
+8
+3
+6
+#'user/a  {using def instead of define}
+#'user/b
+19
+false
+4
+16   {different syntax for Clojure:  (cond (= a 4) 6 (= b 4) (+ 6 7 a) true 25)}
+6
+16   {different syntax, as above: (* (cond (> a b) a (< a b) b true -1) (+ a 1)) }
+
+
+
+Exercise 1.2 (assuming fraction is correctly read as 4/5)
+
+(/ (+ 5 4 (- 2 (- 3 (+ 6 (/ 4 5))))) (* 3 (- 6 2) (- 2 7)))
+
+
+Exercise 1.3
+(defn sumOfMax2Squares [a b c]
+  (cond (> a b) (if (> b c) (+ (* a a) (* b b))
+                            (+ (* a a) (* c c)))
+        (< a b) (if (> a c) (+ (* b b) (* a a))
+                            (+ (* b b) (* c c)))
+        true (if (> a c) (+ (* a a) (* b b))
+                         (+ (* c c) (* a a)))))
+  
+
+Exercise 1.4
+Evaluates to a plus the absolute value of b
+
+
+Exercise 1.5
+Applicative order evaluation would go into an infinite loop, trying to evaluate the (p) argument, which would keep evaluating to (p), never
+making any progress. Normal order does not need to fully evaluate the operands first, so it is fine with just leaving in (p). Eventually the
+if predicate evaluates to true, and it returns the consequent, 0, never needing to evaluate the (p), and so avoiding the infinite loop problem.
+(Instead of infinite loop, applicative order may actually blow up with a stack or memory overflow problem.)
+
+
+Exercise 1.6
+The square root program written using "new-if" would never complete successfully, either entering an infinite loop, or blowing up due to
+exhausting stack space. This is because when it evaluates the first "new-if" it has to evaluate both operands since it is now not a special
+form. Evaluating the second operand, involves a call one level deeper, again involving a "new-if", with the exact same requirement to evaluate
+both operands. We have infinite regress, and can never break out until we abort due to running out of some resource like stack space.
+
+
+Exercise 1.7
+With relatively large numbers, the arbitrary 0.001 absolute value tolerance cutoff works well, because the guess is much larger than 0.001, so
+getting the guess correct to within +/- 0.001 produces pretty good results. With very small numbers, however, 0.001 is considered large relative
+to the numbers, so it breaks down in terms of providing "pretty good" results. For example, even a guess of 0 would be considered within tolerance
+of x = 0.0005, but sqrt(0.0005) == 0 would arguably be a poor answer. A guess of 0.0007 would also be within tolerance of 0.0005, another poor
+
+Computers represent floating point numbers with a limited-precision mantissa and an exponent, similar to "scientific notation", e.g. 2.3 x 10^8.
+Very large numbers do not have precision down to the decimal point, much less past it. So it is quite possible to get into a situation where we
+reach our best guess, but the difference is considered > 0.001, and due to the limited precision the next guess doesn't put us any closer to the
+answer, but perhaps we oscillate between two guess values, never breaking out because it never sees a value that it thinks is within 0.001 tolerance.
+Alternately, it does return a result, but one that is a lousy answer. For
+example, the initial good-enough? has sqrt returning about 0.0323 as sqrt of
+0.0001 and about 0.03126 as sqrt of 0.000001.
+
+Code showing previous linear iterative Clojure version and new version (with
+suffix 2 on functions.) Ad hoc testing shows that it does indeed work much
+better for very large and very small numbers.
+
+(defn average [a b] (/ (+ a b) 2))
+(defn square [x] (* x x))
+(defn abs [x] (if (< x 0) (- x) x))
+
+(defn improve [guess x]
+  (average guess (/ x guess)))
+
+(defn good-enough?
+  [guess x]
+  (< (abs (- (square guess) x)) 0.001))
+(defn good-enough2?
+  [guess prevGuess]
+  (< (/ (abs (- guess prevGuess)) guess) 0.0001))
+
+(def sqrt-iter
+  (fn [guess x]
+    (loop [guess guess x x]
+      (if (good-enough? guess x)
+        guess
+        (recur (improve guess x) x)))))
+
+(def sqrt-iter2	
+  (fn [guess x]
+    (loop [guess guess prevGuess -10]
+      (if (good-enough2? guess prevGuess)
+        guess
+        (recur (improve guess x) guess)))))
+
+
+(defn sqrt [x] (sqrt-iter2 1.0 x))
+
+
+Exercise 1.8
+; Use (x / y^2 + 2y) / 3 for successive approximation of cube root
+
+(defn abs [x] (if (< x 0) (- x) x))
+
+(defn improve [guess x]
+  (/ (+ (/ x guess guess) guess guess) 3.0))
+
+(defn good-enough? [guess prevGuess] (< (/ (abs (- guess prevGuess)) guess) 0.0001))
+
+(def cubert-iter	
+  (fn [guess x]
+    (loop [guess guess prevGuess -10]
+      (if (good-enough? guess prevGuess)
+        guess
+        (recur (improve guess x) guess)))))
+
+
+(defn cubert [x] (cubert-iter 1.0 x))
+
+
+
+Exercise 1.9 (not translating these trivial examples to Clojure)
+(define (+ a b)
+  (if (= a 0)
+    b
+    (inc (+ (dec a) b))))
+
+(+ 4 5)
+(inc (+ (dec 4) 5))
+(inc (+ 3 5))
+(inc (inc (+ (dec 3) 5)))
+(inc (inc (+ 2 5)))
+(inc (inc (inc (+ (dec 2) 5))))
+(inc (inc (inc (+ 1 5))))
+(inc (inc (inc (inc (+ (dec 1) 5)))))
+(inc (inc (inc (inc (+ 0 5)))))
+(inc (inc (inc (inc 5))))
+(inc (inc (inc 6)))
+(inc (inc 7))
+(inc 8)
+9
+
+
+(define (+ a b)
+  (if (= a 0)
+    b
+    (+ (dec a) (inc b))))
+
+(+ 4 5)
+(+ (dec 4) (inc 5))
+(+ 3 6)
+(+ (dec 3) (inc 6))
+(+ 2 7)
+(+ (dec 2) (inc 7))
+(+ 1 8)
+(+ (dec 1) (inc 8))
+(+ 0 9)
+9
+
+The first process is linear recursive. The second process is linear iterative.
+
+
+
+Exercise 1.10  Ackermann's function
+(defn A [x y]
+  (cond (= y 0) 0
+        (= x 0) (* 2 y)
+        (= y 1) 2
+        :else (A (- x 1)
+                 (A x (- y 1)))))
+
+(A 1 10) = 1024
+(A 2 4) = 65536
+(A 3 3) = 65536
+
+
+(define (f n) (A 0 n))
+(define (g n) (A 1 n))
+(define (h n) (A 2 n))
+
+
+For positive integer values of n,
+(f n) computes 2n
+(g n) computes 2^n
+(h n) computes 2^^n (tetration, 2 exponeniated by itself n times, e.g. 2^^4 = 2^(2^(2^2))
+
+
+
+Exercise 1.11
+; compute f where f(n) = n if n < 3 and f(n-1) + 2f(n-2) + 3f(n-3) if n >= 3
+; as a recursive process and a linear process
+
+(defn frecur [n]
+  (if (< n 3) n
+              (+ (frecur (- n 1)) (* 2 (frecur (- n 2))) (* 3 (frecur (- n 3))))))
+
+
+; a, b, c track f(x-1), f(x-2), and f(x-3) respectively
+(defn fiter [n]
+  (if (< n 3) n
+              (loop [x 3 a 2 b 1 c 0]
+                (let [fx (+ a b b c c c)]
+                  (if (= x n) fx
+                              (recur (inc x) fx a b))))))
+
+
+
+Exercise 1.12
+; Compute (row, column) element of Pascal's triangle where row & column are
+; both 1-based and assuming both are ranged correctly (i.e., no error detection here)
+
+(defn pascal [row col]
+  (cond (= col 1) 1
+        (= col row) 1
+        :else (let [prevrow (dec row)]
+                (+ (pascal prevrow (dec col)) (pascal prevrow col)))))
+
+
+
+Exercise 1.13
+Phi = (1 + sqrt(5))/2
+Psi = (1 - sqrt(5))/2
+
+Fib(0) = 0
+Fib(1) = 1
+otherwise Fib(n) = Fib(n-1) + Fib(n-2)
+^ all of these, by definition
+Phi^2 = (1 + Phi)
+Psi^2 = (1 + Psi)
+
+Fib'(n) = (Phi^n - Psi^n)/sqrt(5)
+Fib'(0) = (Phi^0 - Psi^0)/sqrt(5) = (1 - 1)/sqrt(5) = 0/sqrt(5) = 0
+Fib'(1) = (Phi^1 - Psi^1)/sqrt(5) = sqrt(5)/sqrt(5) = 1
+So far, Fib' is same as Fib. In order for this to hold true in general,
+Fib'(n) = Fib'(n-1) + Fib'(n-2)
+  = (Phi^(n-1) - Psi^(n-1) + Phi^(n-2) - Psi^(n-2))/sqrt(5)
+  = ((Phi + 1)*Phi^(n-2) - (Psi + 1)*Psi^(n-2))/sqrt(5)
+  = ((Phi^2)*Phi^(n-2) - (Psi^2)*Psi^(n-2))/sqrt(5)
+  = (Phi^n - Psi^n)/sqrt(5)
+
+therefore Fib(n) = (Phi^n - Psi^n)/sqrt(5) holds true in the general case.
+
+Since this equation determines Fib(n) exactly, and |Psi^n| < 0.5 for all integer n > 1
+then for all n > 1, Phi^n/sqrt(5) differs from Fib(n) by less than 0.5.
+Therefore, for all integer n > 1, closest integer to Phi^n/sqrt(5) must be Fib(n).
+For n = 0, Phi^n/sqrt(5) is approximately .447, and for n = 1, Phi^n/sqrt(5) is
+approximately 0.7236, so closest integers are 0 and 1, respectively, therefore for
+all integer n >= 0, closest integer to Phi^n/sqrt(5) is equal to Fib(n).
+
+
+
+Exercise 1.14
+
+(count-change 11)
+     |
+(cc 11 5) -- (cc -39 5) -- 0
+     |
+(cc 11 4) -- (cc -14 4) -- 0
+     |
+(cc 11 3) ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- (cc 1 3) -- (cc -1 3) -- 0
+     |                                                                                                                                                                                                                                                                                      |
+(cc 11 2) ------------------------------------------------------------------------------------------------------------------------------------------- (cc 6 2) ----------------------------------------------------------------------------- (cc 1 2) -- (cc -4 2) -- 0                 (cc 1 2) -- (cc -4 2) -- 0
+     |                                                                                                                                                    |                                                                                      |                                          |
+(cc 11 1) -- (cc 10 1) -- (cc 9 1) -- (cc 8 1) -- (cc 7 1) -- (cc 6 1) -- (cc 5 1) -- (cc 4 1) -- (cc 3 1) -- (cc 2 1) -- (cc 1 1) -- (cc 0 1) -- 1   (cc 6 1) -- (cc 5 1) -- (cc 4 1) -- (cc 3 1) -- (cc 2 1) -- (cc 1 1) -- (cc 0 1) -- 1  (cc 1 1) -- (cc 0 1) -- 1                  (cc 1 1) -- (cc 0 1) -- 1
+     |           |            |           |           |           |           |           |           |           |           |                           |           |           |           |           |           |                          |                                          |
+(cc 11 0)    (cc 10 0)    (cc 9 0)    (cc 8 0)    (cc 7 0)    (cc 6 0)    (cc 5 0)    (cc 4 0)    (cc 3 0)    (cc 2 0)    (cc 1 0)                    (cc 6 0)    (cc 5 0)    (cc 4 0)    (cc 3 0)    (cc 2 0)    (cc 1 0)                   (cc 1 0)                                   (cc 1 0)
+     |           |            |           |           |           |           |           |           |           |           |                           |           |           |           |           |           |                          |                                          |
+     0           0            0           0           0           0           0           0           0           0           0                           0           0           0           0           0           0                          0                                          0
+
+
+I reckon the tree size (# steps) to be theta(n^2) and maximum depth (space) theta(n).
+
+
+Exercise 1.15
+
+p is executed 5 times when executing (sine 12.15)
+
+angle is divided by 3 each iteration until it reaches 0.1 or below, so the # of iterations
+is equal to about logarithm base 3 of 10*angle.
+The code cannot use tail call optimization, so both the order of growth of space and the number
+of steps is theta(log a).
+
+
+Exercise 1.16
+
+; compute b^n in a fast iterative fashion
+
+(defn fast-expt [b n]
+  (loop [a 1 b b n n]
+    (cond (= n 0) a
+          (even? n) (recur a (* b b) (/ n 2))
+          :else (recur (* a b) b (- n 1)))))
+
+
+
+Exercise 1.17
+
+; compute a*b in a fast fashion
+
+; doubl/halve are theoretically our primitives, in addition to (+)
+; In principle they could for example be a bit shift,but we just use * and / here.
+; Spelled doubl since double is reserved.
+(defn doubl [n] (* n 2))
+(defn halve [n] (/ n 2))
+
+(defn fast-mul [a b]
+  (cond (= b 0) 0
+        (even? b) (fast-mul (doubl a) (halve b))
+        :else (+ a (fast-mul a (- b 1)))))
+
+
+
+Exercise 1.18
+
+; compute a*b in a fast iterative fashion
+
+; doubl/halve are theoretically our primitives, in addition to (+)
+; In principle they could for example be a bit shift,
+; but we just use * and / here. Spelled doubl since double is reserved.
+(defn doubl [n] (* n 2))
+(defn halve [n] (/ n 2))
+
+(defn fast-mul [a b]
+  (loop [s 0 a a b b]
+    (cond (= b 0) s
+          (even? b) (recur s (doubl a) (halve b))
+          :else (recur (+ s a) a (- b 1)))))
+  
+
+Exercise 1.19
+
+Starting with (a0, b0), and applying Tpq once we get (qb0 + qa0 + pa0, pb0 + qa0),
+or a1 = qb0 + qa0 + pa0, b1 = pb0 + qa0. Applying Tpq a second time we get (qb1 + qa1 + pa1, pb1 + qa1),
+or a2 = b0(pq + qq + pq) + a0(qq + qq + pq + pq + pp), b2 = b0(pp + qq) + a0(pq + qq + pq)
+
+We want a2 = q'b0 + q'a0 + p'a0, b2 = p'b0 + q'a0
+therefore if we take p' = pp + qq, and q' = 2pq + qq, it works out in one transformation.
+
+
+; compute nth Fibonacci number efficiently
+
+(defn fib-iter [a b p q count]
+  (loop [a a b b p p q q count count]
+    (cond (= count 0) b
+          (even? count)
+            (recur a
+                   b
+                   (+ (* p p) (* q q))    ; compute p'
+                   (+ (* 2 p q) (* q q))  ; compute q'
+                   (/ count 2))
+          :else (recur (+ (* b q) (* a q) (* a p))
+                       (+ (* b p) (* a q))
+                       p
+                       q
+                       (- count 1)))))
+
+(defn fib [n]
+  (fib-iter 1 0 0 1 n))
+
+
+Exercise 1.20
+
+(define (gcd a b)
+  (if (= b 0)
+      a
+      (gcd b (remainder a b))))
+
+Evaluating (gcd 206 40) in normal order:
+(gcd
+  206
+  40)
+(if (= 40 0)
+  206
+  (gcd
+    40
+    (remainder 206 40)))
+(gcd
+  40
+  (remainder 206 40))
+(if (= (remainder 206 40) 0)
+  40
+  (gcd
+    (remainder 206 40)
+    (remainder 40 (remainder 206 40))))
+(if (= 6 0)        ; 1 remainder performed here
+  40
+  (gcd
+    (remainder 206 40)
+    (remainder 40 (remainder 206 40))))
+(gcd
+  (remainder 206 40)
+  (remainder 40 (remainder 206 40)))
+(if (= (remainder 40 (remainder 206 40)) 0)
+  (remainder 206 40)
+  (gcd
+    (remainder 40 (remainder 206 40))
+    (remainder (remainder 206 40) (remainder 40 (remainder 206 40)))))
+(if (= (remainder 40 6) 0)    ; 1 remainder performed here
+  (remainder 206 40)
+  (gcd
+    (remainder 40 (remainder 206 40))
+    (remainder (remainder 206 40) (remainder 40 (remainder 206 40)))))
+(if (= 4 0)                   ; 1 remainder performed here
+  (remainder 206 40)
+  (gcd
+    (remainder 40 (remainder 206 40))
+    (remainder (remainder 206 40) (remainder 40 (remainder 206 40)))))
+(gcd
+  (remainder 40 (remainder 206 40))
+  (remainder (remainder 206 40) (remainder 40 (remainder 206 40))))
+(if (= (remainder (remainder 206 40) (remainder 40 (remainder 206 40))) 0)
+  (remainder 40 (remainder 206 40))
+  (gcd
+    (remainder (remainder 206 40) (remainder 40 (remainder 206 40)))
+    (remainder (remainder 40 (remainder 206 40)) (remainder (remainder 206 40) (remainder 40 (remainder 206 40))))))
+(if (= (remainder 6 (remainder 40 6)) 0)    ; 2 remainders performed here
+  (remainder 40 (remainder 206 40))
+  (gcd
+    (remainder (remainder 206 40) (remainder 40 (remainder 206 40)))
+    (remainder (remainder 40 (remainder 206 40)) (remainder (remainder 206 40) (remainder 40 (remainder 206 40))))))
+(if (= (remainder 6 4) 0)                   ; 1 remainder performed here
+  (remainder 40 (remainder 206 40))
+  (gcd
+    (remainder (remainder 206 40) (remainder 40 (remainder 206 40)))
+    (remainder (remainder 40 (remainder 206 40)) (remainder (remainder 206 40) (remainder 40 (remainder 206 40))))))
+(if (= 2 0)                                 ; 1 remainder performed here
+  (remainder 40 (remainder 206 40))
+  (gcd
+    (remainder (remainder 206 40) (remainder 40 (remainder 206 40)))
+    (remainder (remainder 40 (remainder 206 40)) (remainder (remainder 206 40) (remainder 40 (remainder 206 40))))))
+(gcd
+  (remainder (remainder 206 40) (remainder 40 (remainder 206 40)))
+  (remainder (remainder 40 (remainder 206 40)) (remainder (remainder 206 40) (remainder 40 (remainder 206 40))))))
+(if (= (remainder (remainder 40 (remainder 206 40)) (remainder (remainder 206 40) (remainder 40 (remainder 206 40)))) 0)
+  (remainder (remainder 206 40) (remainder 40 (remainder 206 40)))
+  (gcd
+    (remainder (remainder 40 (remainder 206 40)) (remainder (remainder 206 40) (remainder 40 (remainder 206 40))))
+    (remainder 
+      (remainder (remainder 206 40) (remainder 40 (remainder 206 40)))
+      (remainder (remainder 40 (remainder 206 40)) (remainder (remainder 206 40) (remainder 40 (remainder 206 40)))))))
+(if (= (remainder (remainder 40 6) (remainder 6 (remainder 40 6))) 0)       ; 3 remainders performed here
+  (remainder (remainder 206 40) (remainder 40 (remainder 206 40)))
+  (gcd
+    (remainder (remainder 40 (remainder 206 40)) (remainder (remainder 206 40) (remainder 40 (remainder 206 40))))
+    (remainder 
+      (remainder (remainder 206 40) (remainder 40 (remainder 206 40)))
+      (remainder (remainder 40 (remainder 206 40)) (remainder (remainder 206 40) (remainder 40 (remainder 206 40)))))))
+(if (= (remainder 4 (remainder 6 4)) 0)                                     ; 2 remainders performed here
+  (remainder (remainder 206 40) (remainder 40 (remainder 206 40)))
+  (gcd
+    (remainder (remainder 40 (remainder 206 40)) (remainder (remainder 206 40) (remainder 40 (remainder 206 40))))
+    (remainder 
+      (remainder (remainder 206 40) (remainder 40 (remainder 206 40)))
+      (remainder (remainder 40 (remainder 206 40)) (remainder (remainder 206 40) (remainder 40 (remainder 206 40)))))))
+(if (= (remainder 4 2) 0)                                                   ; 1 remainder performed here
+  (remainder (remainder 206 40) (remainder 40 (remainder 206 40)))
+  (gcd
+    (remainder (remainder 40 (remainder 206 40)) (remainder (remainder 206 40) (remainder 40 (remainder 206 40))))
+    (remainder 
+      (remainder (remainder 206 40) (remainder 40 (remainder 206 40)))
+      (remainder (remainder 40 (remainder 206 40)) (remainder (remainder 206 40) (remainder 40 (remainder 206 40)))))))
+(if (= 0 0)                                                                 ; 1 remainder performed here
+  (remainder (remainder 206 40) (remainder 40 (remainder 206 40)))
+  (gcd
+    (remainder (remainder 40 (remainder 206 40)) (remainder (remainder 206 40) (remainder 40 (remainder 206 40))))
+    (remainder 
+      (remainder (remainder 206 40) (remainder 40 (remainder 206 40)))
+      (remainder (remainder 40 (remainder 206 40)) (remainder (remainder 206 40) (remainder 40 (remainder 206 40)))))))
+(remainder (remainder 206 40) (remainder 40 (remainder 206 40)))
+(remainder 6 (remainder 40 6))                                              ; 2 remainders performed here
+(remainder 6 4)                                                             ; 1 remainder performed here
+2                                                                           ; 1 remainder performed here
+
+
+
+Evaluating (gcd 206 40) in applicative order:
+(gcd
+  206
+  40)
+(if (= 40 0)
+  206
+  (gcd 40 (remainder 206 40)))
+(gcd 40 (remainder 206 40)))
+(gcd 40 6)                                                                  ; 1 remainder performed here
+(if (= 6 0)
+  40
+  (gcd 6 (remainder 40 6)))
+(gcd 6 (remainder 40 6))
+(gcd 6 4)                                                                   ; 1 remainder performed here
+(if (= 4 0)
+  6
+  (gcd 4 (remainder 6 4)))
+(gcd 4 (remainder 6 4))
+(gcd 4 2)                                                                   ; 1 remainder performed here
+(if (= 2 0)
+  4
+  (gcd 2 (remainder 4 2)))
+(gcd 2 (remainder 4 2))
+(gcd 2 0)                                                                   ; 1 remainder performed here
+(if (= 0 0)
+  2
+  (gcd 0 (remainder 2 0)))
+2
+
+
+Total of 18 remainders performed in normal order evaluation of (gcd 206 40)
+Only 4 remainders performed in applicative order evaluation of (gcd 206 40)
+
+
+
+
+
+
+
+Exercise 1.21
+; find smallest divisor of n
+(defn remainder [a b] (mod a b))
+(defn square [n] (* n n))
+(defn divides? [a b]
+  (= (remainder b a) 0))
+(defn find-divisor [n test-divisor]
+  (loop [n n test-divisor test-divisor]
+    (cond (> (square test-divisor) n) n
+          (divides? test-divisor n) test-divisor
+          :else (recur n (+ test-divisor 1)))))
+(defn find-divisor [n test-divisor]
+  (cond (> (square test-divisor) n) n
+        (divides? test-divisor n) test-divisor
+        :else (find-divisor n (+ test-divisor 1))))
+(defn smallest-divisor [n]
+  (find-divisor n 2))
+
+
+Smallest divisors of 199, 1999, and 19999 are 199, 1999, and 7, respectively.
+
+
+
+Exercise 1.22
+
+; find smallest divisor of n
+(defn remainder [a b] (mod a b))
+(defn square [n] (* n n))
+(defn divides? [a b]
+  (= (remainder b a) 0))
+(defn find-divisor [n test-divisor]
+  (loop [n n test-divisor test-divisor]
+    (cond (> (square test-divisor) n) n
+          (divides? test-divisor n) test-divisor
+          :else (recur n (+ test-divisor 1)))))
+(defn smallest-divisor [n]
+  (find-divisor n 2))
+
+(defn prime? [n]
+  (= n (smallest-divisor n)))
+
+(defn report-prime [elapsed-time]
+  (print " *** ")
+  (print elapsed-time))
+(defn start-prime-test [n start-time]
+  (if (prime? n)
+      (report-prime (- (System/currentTimeMillis) start-time))))
+
+(defn timed-prime-test [n]
+  (newline)
+  (print n)
+  (start-prime-test n (System/currentTimeMillis)))
+
+(defn search-for-primes [min]
+  (loop [n min remaining 3]
+    (cond (= remaining 0) (newline)
+          (prime? n)
+            (do
+              (timed-prime-test n)
+              (recur (+ 2 n) (- remaining 1)))
+          :else (recur (+ 2 n) remaining))))
+
+
+Timing tests frustrated by multiple factors including millisecond granularity (quite rough compared
+to current processor speeds.) So couldn't get reliable timing numbers from primes around 1000.
+Around 1000000, it took about 1 ms, and at 10000000, it took about 2-3 ms, and at 100000000 it took about 7-9 ms,
+and at 1000000000 it took about 25-26 ms. We would expect order sqrt(n) timing, so each factor of 10
+increase in n should cause a factor of sqrt(10) or about 3.2 increase in runtime. Our timing measurements
+seem to confirm that the timing numbers are approximately proportional to the number of steps taken.
+
+
+Exercise 1.23
+
+; cannot use name next because it is reserved
+(defn next-divisor
+  "return next divisor value to test for find-divisor"
+  [n]
+  (if (= n 2) 3 (+ n 2)))
+
+; find smallest divisor of n
+(defn remainder [a b] (mod a b))
+(defn square [n] (* n n))
+(defn divides? [a b]
+  (= (remainder b a) 0))
+(defn find-divisor [n test-divisor]
+  (loop [n n test-divisor test-divisor]
+    (cond (> (square test-divisor) n) n
+          (divides? test-divisor n) test-divisor
+          :else (recur n (+ test-divisor 1)))))
+(defn smallest-divisor [n]
+  (find-divisor n 2))
+
+(defn prime? [n]
+  (= n (smallest-divisor n)))
+
+(defn report-prime [elapsed-time]
+  (print " *** ")
+  (print elapsed-time))
+(defn start-prime-test [n start-time]
+  (if (prime? n)
+      (report-prime (- (System/currentTimeMillis) start-time))))
+
+(defn timed-prime-test [n]
+  (newline)
+  (print n)
+  (start-prime-test n (System/currentTimeMillis)))
+
+(defn search-for-primes [min]
+  (loop [n min remaining 3]
+    (cond (= remaining 0) (newline)
+          (prime? n)
+            (do
+              (timed-prime-test n)
+              (recur (+ 2 n) (- remaining 1)))
+          :else (recur (+ 2 n) remaining))))
+
+
+At around 10000000 this test takes about 1-2 ms., and at 100000000 the test takes about 4-5 ms.
+and at around 1000000000 it takes around 14-16 ms. In principle we expect a 2x speedup, however
+we do not quite realize a full 2x speedup because part of the savings in fewer iterations of
+find-divisor are offset by the overhead of calling next-divisor.
+
+
+Exercise 1.24
+
+(defn expmod [base exp m]
+   (cond (= exp 0) 1
+         (even? exp)
+           (remainder (square (expmod base (/ exp 2) m))
+                      m)
+         :else (remainder (* base (expmod base (- exp 1) m))
+                          m)))
+
+(defn fermat-test [n]
+  (defn try-it [a]
+    (= (expmod a n n) a))
+  (try-it (+ 1 (rand-int (- n 1)))))
+(defn fast-prime? [n times]
+  (loop [n n times times]
+    (cond (= times 0) true
+          (fermat-test n) (recur n (- times 1))
+          :else false)))
+
+(defn prime? [n] (fast-prime? n 4))
+
+(defn report-prime [elapsed-time]
+  (print " *** ")
+  (print elapsed-time))
+(defn start-prime-test [n start-time]
+  (if (prime? n)
+      (report-prime (- (System/currentTimeMillis) start-time))))
+
+(defn timed-prime-test [n]
+  (newline)
+  (print n)
+  (start-prime-test n (System/currentTimeMillis)))
+
+(defn search-for-primes [min]
+  (loop [n min remaining 3]
+    (cond (= remaining 0) (newline)
+          (prime? n)
+            (do
+              (timed-prime-test n)
+              (recur (+ 2 n) (- remaining 1)))
+          :else (recur (+ 2 n) remaining))))
+
+
+Times on the 1.24 version are barely measureable, even only measuring a ms. or so around 10000000000
+and even when the number gets 2 or 3 orders of magnitude higher. For this reason, it is difficult to
+confirm the actual log n growth, however it is clear that the runtime is much better than the prev.
+ones, and the growth pattern seems equally so, so it is reasonable to assume that we have approx.
+log n growth rate.
+
+
+
+Exercise 1.25
+
+Alyssa's suggestion to simply use fast-expt in conjunction with remainder would work in principle,
+however it is likely to be considerably slower than our expmod version. The reason for this is that
+we are using arbitrary precision integer math, hence operations on values with more digits take longer.
+Our expmod implementation applies remainder at each step, keeping values from growing very large, so
+the overall operation should take less time than waiting until the end to apply remainder once to a large value.
+
+
+
+Exercise 1.26
+
+By using explicit multiplication instead of square, each operand of the multiplication has to get
+evaluated independently. So whereas we only make one recursive call to expmod with the "square"
+implementation, with the multiplication implementation, we would actually make 2. The whole principle
+of halving the problem space has been nullified, and the theta(log n) becomes theta(n).
+
+
+
+Exercise 1.27
+
+(defn expmod [base exp m]
+   (cond (= exp 0) 1
+         (even? exp)
+           (remainder (square (expmod base (/ exp 2) m))
+                      m)
+         :else (remainder (* base (expmod base (- exp 1) m))
+                          m)))
+
+(defn test-carmichael [n]
+  (loop [a 1]
+    (cond (= n a) true
+          (= (expmod a n n) (remainder a n)) (recur (+ 1 a))
+          :else false)))
+
+
+This does indeed return true for all the Carmichael numbers mentioned in footnote 47.
+
+
+Exercise 1.28
+
+; squaring step in expmod, we check to see if we have discovered a ``nontrivial square root of 1 modulo n,''
+; that is, a number not equal to 1 or n - 1 whose square is equal to 1 modulo n. It is possible to prove that if
+; such a nontrivial square root of 1 exists, then n is not prime. It is also possible to prove that if n is an odd
+(defn expmod [base exp m]
+   (cond (= exp 0) 1
+         (even? exp)
+           (let [root (expmod base (/ exp 2) m) sqr (remainder (square root) m)]
+             (if (and (not= root 1) (not= root (- m 1)) (= sqr 1))
+               0        ; signal that found nontrivial square root of 1
+               sqr))
+         :else (remainder (* base (expmod base (- exp 1) m))
+                          m)))
+
+(defn fermat-test [n]
+  (defn try-it [a]
+    (= (expmod a n n) a))
+  (try-it (+ 1 (rand-int (- n 1)))))
+(defn fast-prime? [n times]
+  (loop [n n times times]
+    (cond (= times 0) true
+          (fermat-test n) (recur n (- times 1))
+          :else false)))
+
+(defn prime? [n] (fast-prime? n 4))
+
+(defn report-prime [elapsed-time]
+  (print " *** ")
+  (print elapsed-time))
+(defn start-prime-test [n start-time]
+  (if (prime? n)
+      (report-prime (- (System/currentTimeMillis) start-time))))
+
+(defn timed-prime-test [n]
+  (newline)
+  (print n)
+  (start-prime-test n (System/currentTimeMillis)))
+
+(defn search-for-primes [min]
+  (loop [n min remaining 3]
+    (cond (= remaining 0) (newline)
+          (prime? n)
+            (do
+              (timed-prime-test n)
+              (recur (+ 2 n) (- remaining 1)))
+          :else (recur (+ 2 n) remaining))))
+
+
+
+Exercise 1.29
+
+(defn coefficient
+  "Compute coefficient for term for evaluation via Simpson's Rule"
+  [n total-n]
+  (cond (= 0 n) 1
+        (= total-n n) 1
+        (even? n) 2
+        :else 4))
+
+(defn sum-simp [f a h n]
+  (loop [k 0 acc 0]
+    (if (> k n)
+      acc
+      (recur (inc k) (+ acc (* (coefficient k n) (f (+ a (* k h)))))))))
+
+(defn integral
+  "Compute integral of f from a to b using n samples, via Simpson's Rule"
+  [f a b n]
+  (let [h (/ (- b a) n)]
+    (/ (* h (sum-simp f a h n)) 3)))
+
+
+This implementation uses rational rather than floating point math.
+For computing integral of cube from 0 to 1, it computes exactly 1/4 for any
+even n > 0, including 100 and 1000.
+
+From the way the exercise is worded, perhaps the authors expected the
+implementation to use floating point, but it seems silly to rewrite it to
+make it less precise.
+
+
+
+Exercise 1.30
+
+(defn sum
+  "Iterative function to sum terms from a to b"
+  [term a next b]
+  (loop [a a result 0]
+    (if (> a b)
+        result
+        (recur (inc a) (+ result (term a))))))
+    
+
+
+Exercise 1.31
+Implemented using floating point this time.
+
+(defn product
+  "Iterative function to multiply terms from a to b"
+  [term a next b]
+  (loop [a a result 1.0]
+    (if (> a b)
+        result
+        (recur (next a) (* result (term a))))))
+    
+(defn pi-div-4 [nterms]
+  (defn piterm [n]
+    (if (even? n)
+        (/ (+ n 2) (+ n 3))
+        (/ (+ n 3) (+ n 2))))
+  (product piterm 0 inc nterms))
+  
+
+part b)
+(defn product
+  "Recursive function to multiply terms from a to b"
+  [term a next b]
+  (if (> a b)
+      1.0
+      (* (term a) (product term (next a) next b))))
+    
+
+Exercise 1.32
+
+Both sum and product iterate over a range of numbers, applying
+a certain operation to each number in turn, to generate a term,
+and then applying a binary merge operation to merge the current
+term into the accumulated result. For sum, the merge operation
+is + and for product, the merge operation is *. In each case,
+the accumulator must be initialized with the appropriate "zero"
+for the operation. For sum, the "zero" is 0, and for product, the
+"zero" is 1. SICP calls this "zero" the null-value or base value.
+
+(defn accumulate
+  "accumulate a collection of terms from a to b using a combiner function"
+  [combiner null-value term a next b]
+  (loop [acc null-value n a]
+    (if (> n b)
+        acc
+        (recur (combiner acc (term n)) (next n)))))
+
+(defn sum [term a next b]
+  (accumulate + 0 term a next b))
+
+(defn product [term a next b]
+  (accumulate * 1 term a next b))
+
+
+part b) implement accumulator as a recursive procedure
+
+(defn accumulate
+  "accumulate a collection of terms from a to b using a combiner function"
+  [combiner null-value term a next b]
+  (if (> a b)
+      null-value
+      (combiner (accumulate combiner null-value term (next a) next b) (term a))))
+
+
+
+Exercise 1.33
+
+(defn filtered-accumulate
+  "accumulate a filtered collection of terms from a to b using a combiner"
+  [combiner null-value term a next b filterp]
+  (loop [acc null-value n a]
+    (if (> n b)
+      acc
+      (let [cur-term (term n) next-n (next n)]
+        (if (filterp cur-term)
+            (recur (combiner acc cur-term) next-n)
+            (recur acc next-n))))))
+
+(defn sum-prime-squares [a b]
+  (defn square [n] (* n n))
+  (defn id [n] n)
+  (defn combiner [acc n] (+ acc (* n n)))
+  (filtered-accumulate combiner 0 id a inc b prime?))
+
+(defn prod-relative-primes
+  "compute product of all positive integers less than n that are relatively prime to n"
+  [n]
+  (defn id [n] n)
+  (defn gcd [a b]
+    (if (= b 0)
+        a
+        (gcd b (remainder a b))))
+  (defn filterp [i] (= (gcd i n) 1))
+  (filtered-accumulate * 1 id 1 inc (- n 1) filterp))
+
+
+Exercise 1.34
+
+(defn f [g] (g 2))
+
+Trying to evaluate (f f) with Clojure blows up with a ClassCastException
+because it will evaluate to (f 2) and then balk when trying to further
+evaluate because it's expecting a function as the argument to f, and it
+cannot cast integer 2 to an integer function.
+
+
+Exercise 1.35
+
+Fixed point of x -> 1 + 1/x is the value x such that x = 1 + 1/x.
+We are given Phi^2 = Phi + 1 by definition of the golden ratio. Dividing
+each side by Phi we get Phi = 1 + 1/Phi, and can immediately see that
+Phi serves as a fixed point for x -> 1 + 1/x.
+
+
+Have to use tryf in place of try since try is a Clojure reserved word.
+
+(defn fixed-point [f first-guess]
+  (defn abs [x] (if (< x 0.0) (- x) x))
+  (defn close-enough? [v1 v2]
+    (let [tolerance 0.00001]
+      (< (abs (- v1 v2)) tolerance)))
+  (defn tryf [guess]
+    (let [next (f guess)]
+      (if (close-enough? guess next)
+          next
+          (tryf next))))
+  (tryf first-guess))
+
+
+Or iteratively:
+
+(defn fixed-point [f first-guess]
+  (defn abs [x] (if (< x 0.0) (- x) x))
+  (defn close-enough? [v1 v2]
+    (let [tolerance 0.00001]
+      (< (abs (- v1 v2)) tolerance)))
+  (defn tryf [guess]
+    (loop [guess guess next (f guess)]
+      (if (close-enough? guess next)
+          next
+          (recur next (f next)))))
+  (tryf first-guess))
+
+user=> (fixed-point (fn [x] (+ 1 (/ 1 x))) 1.0)
+1.6180327868852458
+
+
+
+Exercise 1.36
+
+(defn fixed-point [f first-guess]
+  (defn abs [x] (if (< x 0.0) (- x) x))
+  (defn close-enough? [v1 v2]
+    (let [tolerance 0.00001]
+      (< (abs (- v1 v2)) tolerance)))
+  (defn tryf [guess]
+    (loop [guess guess next (f guess)]
+      (println guess)
+      (if (close-enough? guess next)
+          next
+          (recur next (f next)))))
+  (tryf first-guess))
+
+
+user=> (fixed-point (fn [x] (/ (Math/log 1000) (Math/log x))) 10)
+10
+2.9999999999999996
+6.2877098228681545
+3.7570797902002955
+5.218748919675316
+4.1807977460633134
+4.828902657081293
+4.386936895811029
+4.671722808746095
+4.481109436117821
+4.605567315585735
+4.522955348093164
+4.577201597629606
+4.541325786357399
+4.564940905198754
+4.549347961475409
+4.5596228442307565
+4.552843114094703
+4.55731263660315
+4.554364381825887
+4.556308401465587
+4.555026226620339
+4.55587174038325
+4.555314115211184
+4.555681847896976
+4.555439330395129
+4.555599264136406
+4.555493789937456
+4.555563347820309
+4.555517475527901
+4.555547727376273
+4.555527776815261
+4.555540933824255
+4.555532257016376
+user=>
+
+
+Now, with average damping:
+
+user=> (fixed-point (fn [x] (average x (/ (Math/log 1000) (Math/log x)))) 10)
+10
+6.5
+5.095215099176933
+4.668760681281611
+4.57585730576714
+4.559030116711325
+4.55613168520593
+4.555637206157649
+4.55555298754564
+4.555538647701617
+4.555536206185039
+user=>
+
+It only took 11 steps with average damping, versus 34 steps without damping.
+
+
+Exercise 1.37
+
+a.
+
+; Evaluate continued fraction based upon n and d which return terms for
+; the numerator and denominator, and k is number of terms (indexed by 1).
+(defn cont-frac [n d k]
+  (defn contR [i]
+    (if (= i k)
+        (/ (n i) (d i))
+        (/ (n i) (+ (d i) (contR (inc i))))))
+  (contR 1))
+
+
+It takes k of 10 to approximate golden ratio to 4 decimal digits:
+
+user=> (cont-frac (fn [x] 1.0) (fn [x] 1.0) 10)
+0.6179775280898876
+
+
+
+b. Iterative process version:
+
+; Evaluate continued fraction based upon n and d which return terms for
+; the numerator and denominator, and k is number of terms (indexed by 1).
+; this version uses an iterative process
+(defn cont-frac [n d k]
+  (loop [i k acc 0]
+    (if (= i 0)
+        acc
+        (recur (dec i) (/ (n i) (+ (d i) acc))))))
+
+
+
+
+Exercise 1.38
+
+; compute e via Euler's continued fraction, using k steps
+; all Ni = 1, Di = 1,2,1,1,4,1,1,6,1,1,8,...
+(defn compute-e [k]
+  (defn d [i]
+    (if (= (rem i 3) 2)
+        (/ (+ i i 2) 3)
+		1))
+  (+ 2 (cont-frac (fn [x] 1.0) d k)))
+
+
+Exercise 1.39
+
+; compute tangent function via Lambert's continued fraction
+; N1 = r; all other Ni = -r^2;  Di = 2i-1;  x is angle in radians; k is # steps
+(defn tan-cf [x k]
+  (let [mxx (- (* x x))]
+    (defn n [i]
+      (if (= i 1)
+          x
+          mxx))
+    (cont-frac n (fn [i] (+ i i -1)) k)))
+
+
+
+Exercise 1.40
+
+(defn cubic
+  "return function that computes f(x) -> ax^2 + bx + c"
+  [a b c]
+  (fn [x] (+ (* x x x) (* a x x) (* b x) c)))
+
+
+Exercise 1.41
+
+(defn doublef
+  "takes 1-arg procedure and returns procedure that applies original twice"
+  [f]
+  (fn [x] (f (f x))))
+
+
+(((doublef (doublef doublef)) inc) 5) returns 21
+
+
+Exercise 1.42
+
+(defn compose
+  "compose f after g: create function that takes x and returns f(g(x))"
+  [f g]
+  (fn [x] (f (g x))))
+	
+
+
+Exercise 1.43
+
+(defn compose
+  "compose f after g: create function that takes x and returns f(g(x))"
+  [f g]
+  (fn [x] (f (g x))))
+
+(defn repeated
+  "nth repeated application of f"
+  [f n]
+  (fn [x] (if (= n 0)
+              x
+              ((compose f (repeated f (dec n))) x))))
+
+
+
+Exercise 1.44
+
+(defn smooth
+  "create smoothed version that averages f(x) with f(x-dx) and f(x+dx)"
+  [f]
+  (let [dx 0.0001]
+    (fn [x] (/ (+ (f (- x dx)) (f x) (f (+ x dx))) 3))))
+
+(defn smooth-repeated
+  "create the n-fold smoothed function based upon f"
+  [f n]
+  ((repeated smooth n) f))
+
+
+
+Exercise 1.45
+
+(defn nthroot
+  "try to find nth root of x using a repeated applications of average damping"
+  [n x a]
+  (fixed-point ((repeated average-damp a) (fn [y] (/ x (Math/pow y (- n 1))))) 2.0))
+
+Experimentation with the above code with fixed-point instrumented with
+debugging println empirically shows that the number of applications of
+average damping required for the nth root calculation increases by 1
+each time n reaches another power of 2. For n = 2, 1 application required,
+but for n = 32, 5 applications are required. For n = 31, 4 applications req'd.
+So a should be equal to the floor of log-base-2 of n.
+
+This leads to the following code:
+
+
+(defn average2 [x y] (/ (+ x y) 2))
+(defn average-damp
+  "return a modified version of function that averages its value with its arg"
+  [f]
+  (fn [x] (average2 x (f x))))
+
+(defn fixed-point [f first-guess]
+  (defn abs [x] (if (< x 0.0) (- x) x))
+  (defn close-enough? [v1 v2]
+    (let [tolerance 0.00001]
+      (< (abs (- v1 v2)) tolerance)))
+  (defn tryf [guess]
+    (loop [guess guess next (f guess)]
+      (if (close-enough? guess next)
+          next
+          (recur next (f next)))))
+  (tryf first-guess))
+
+(defn compose
+  "compose f after g: create function that takes x and returns f(g(x))"
+  [f g]
+  (fn [x] (f (g x))))
+
+(defn repeated
+  "nth repeated application of f"
+  [f n]
+  (fn [x] (if (= n 0)
+              x
+              ((compose f (repeated f (dec n))) x))))
+
+(defn floor-log2
+  "return floor of log base 2 of n for positive n"
+  [n]
+  (loop [l 0 ll 2]
+    (if (> ll n)
+        l
+        (recur (inc l) (* 2 ll)))))
+
+(defn nthroot
+  "try to find nth root of x using repeated applications of average damping"
+  [n x]
+  (fixed-point
+    ((repeated average-damp (floor-log2 n)) (fn [y] (/ x (Math/pow y (- n 1)))))
+    2.0))
+
+
+
+Exercise 1.46
+
+(def tolerance 0.00001)
+(defn iterative-improve
+  "perform iterative improvements of guess until it's good enough"
+  [good-enough? improve]
+  (fn [initial-guess]
+    (loop [prev-guess initial-guess new-guess (improve initial-guess)]
+      (if (good-enough? new-guess prev-guess)
+          new-guess
+          (recur new-guess (improve new-guess))))))
+
+(defn average [x y] (/ (+ x y) 2))
+(defn abs [x] (if (< x 0) (- x) x))
+(defn good-enough?
+  [guess prevGuess]
+  (< (/ (abs (- guess prevGuess)) guess) 0.0001))
+
+(defn sqrt [x]
+  (defn improve-sqrt [guess]
+    (average guess (/ x guess)))
+  ((iterative-improve good-enough? improve-sqrt) 1.0))
+
+(defn fixed-point
+  [f first-guess]
+  ((iterative-improve good-enough? (fn [x] (f x))) first-guess))
+
+
